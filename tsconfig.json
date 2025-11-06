@@ -1,0 +1,42 @@
+{
+        "compilerOptions": {
+            "target": "es2020",
+            "module": "ES2020",
+            "esModuleInterop": true,
+            "outDir": "./preBuild/l2",
+            "rootDir": "./prel2",
+            "strict": true,
+            "removeComments": false,
+            "noUnusedParameters": false,
+            "skipLibCheck": false,
+            "forceConsistentCasingInFileNames": true,
+            "sourceMap": false,
+            "declaration": false,
+            "experimentalDecorators": true,
+            "emitDecoratorMetadata": false,
+            "noImplicitAny": false,
+            "strictNullChecks": false,
+            "paths": {
+                "lit": [
+                    "./prel2/_100554_litElement.ts"
+                ],
+                "lit/decorators.js": [
+                    "./prel2/_100554_litDecorators.ts"
+                ]
+            },
+            "lib": [
+                "dom",
+                "ES2022"
+            ]
+        },
+        "include": [
+            "prel2/**/*",
+            "monaco.d.ts",
+            "mls.d.ts"
+        ],
+        "exclude": [
+            "node_modules",
+            "**/*.spec.ts",
+            "l2/*.ts"
+        ]
+    }
