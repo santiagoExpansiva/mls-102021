@@ -1,0 +1,253 @@
+/// <mls shortName="liveServer" project="102021" enhancement="enhancementStyle" folder="" />
+
+live-server-102021 {
+
+position: relative;
+    display: block;
+    margin: 0; 
+    background: linear-gradient(180deg, #071022 0%, #081726 100%);
+    color: #e6eef6;
+    width: 100%;
+    height: 100%;
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+
+    .wrap {
+        max-width: 980px;
+        padding: 24px;
+    }
+
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    h1 {
+        font-size: 20px;
+        margin: 0;
+        letter-spacing: 0.2px;
+    }
+
+    p.lead {
+        margin: 0;
+        color: #9aa6b2;
+        font-size: 13px;
+    }
+
+    .list {
+        display: grid;
+        gap: 12px;
+    }
+
+    .server {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 14px;
+        border-radius: 10px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+        box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+        border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .server-main {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .thumb {
+        width: 56px;
+        height: 56px;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.12));
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        color: #9aa6b2;
+        font-size: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.03);
+
+        svg{
+            width: 30px !important;
+            height: 30px !important;
+            fill: white;
+        }
+    }
+
+    .meta {
+        min-width: 0;
+    }
+
+    .meta .name {
+        font-weight: 600;
+        font-size: 15px;
+        margin-bottom: 4px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .meta .desc {
+        font-size: 13px;
+        color: #9aa6b2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 220px;
+        justify-content: flex-end;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #062024;
+    }
+
+    .badge--on {
+        background: linear-gradient(90deg, rgba(22, 163, 74, 0.15), rgba(22, 163, 74, 0.06));
+        color: #16a34a;
+        border: 1px solid rgba(22, 163, 74, 0.18);
+    }
+
+    .badge--restart {
+        background: linear-gradient(90deg, rgba(144, 163, 22, 0.15), rgba(158, 163, 22, 0.06));
+        color: #16a34a;
+        border: 1px solid rgba(156, 163, 22, 0.18);
+    }
+
+    .badge--off {
+        background: linear-gradient(90deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.12);
+    }
+
+    .controls {
+        display: flex;
+        gap: 8px;
+        margin-left: 12px;
+    }
+
+    button.btn {
+        appearance: none;
+        border: 0;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 13px;
+        cursor: pointer;
+        font-weight: 600;
+        background: rgba(255,255,255,0.03);
+        color: #9aa6b2;
+        transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    button.btn:active {
+        transform: translateY(1px) scale(.998);
+    }
+
+    button.btn:focus {
+        outline: 2px solid rgba(6, 182, 212, 0.14);
+        box-shadow: 0 4px 18px rgba(6, 182, 212, 0.06);
+    }
+
+    button.btn--primary {
+        background: linear-gradient(90deg, rgba(6, 182, 212, 0.12), rgba(6, 182, 212, 0.06));
+        color: #06b6d4;
+        border: 1px solid rgba(6, 182, 212, 0.08);
+    }
+
+    button.btn--danger {
+        background: linear-gradient(90deg, rgba(239, 68, 68, 0.06), rgba(239, 68, 68, 0.02));
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.06);
+    }
+
+    .icon {
+        width: 14px;
+        height: 14px;
+        display: inline-block;
+        vertical-align: middle;
+        opacity: 0.95;
+    }
+
+    /* small responsive */
+    @media (max-width:700px) {
+        .server {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .status {
+            justify-content: space-between;
+            min-width: 0;
+            margin-top: 10px;
+        }
+
+        .controls {
+            margin-left: 0;
+            justify-content: flex-end;
+        }
+    }
+
+    .spinner{
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      border:2px solid rgba(255,255,255,0.08);
+      border-top-color:rgba(255,255,255,0.28);
+      animation:spin .9s linear infinite;
+    }
+    @keyframes spin{ to { transform:rotate(360deg); } }
+
+
+
+    /* Modal */
+    .modal-backdrop{
+      position:absolute;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(2,6,23,0.6);
+      z-index:40;
+    }
+    .modal-backdrop.show{ display:flex; }
+    .modal {
+      width:min(720px, 92%);
+      background: linear-gradient(180deg, #071226, #061424);
+      border-radius:12px;
+      padding:18px;
+      border:1px solid rgba(255,255,255,0.03);
+      box-shadow:0 12px 40px rgba(2,6,23,0.7);
+    }
+
+    .modal iframe{
+        width: 100%;
+        height: 500px;
+    }
+    .modal h3{ margin:0 0 8px 0; font-size:18px; }
+    .modal p{ margin:0 0 12px 0; color:#9aa6b2; font-size:13px; }
+    .modal .close { float:right; }
+
+ }
+
+
