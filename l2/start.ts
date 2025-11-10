@@ -11,6 +11,7 @@ let body = document.querySelector('body') as HTMLElement;
 
 export async function start(project: number, startServers: 'all' | 'none' | string = 'none') {
 
+    if (listItens) return;
     const m = await getProjectConfig(project);
     const array: IListItem[] = [];
 
@@ -60,7 +61,10 @@ function createServer(info: IListItem,  start: boolean): void {
     server.iframe.onload = () => {
         try {
             setHtml(server);
-            if (start) onServer(server);
+            if (start) {
+                server.status = 'on';
+                onServer(server);
+            }
 
         } catch (e) {
             server.status = 'off';
