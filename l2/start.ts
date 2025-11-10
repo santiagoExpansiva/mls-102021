@@ -74,7 +74,7 @@ function createServer(info: IListItem,  start: boolean): void {
     servers = {};
     Object.keys(iframes).forEach((key: string) => {
         const f = listItens.find((i: IListItem) => i.server === key);
-        if (f) servers[f.server] = iframes[key];
+        if (f) servers[f.name] = iframes[key];
     });
 
     (top as any).previewL1 = servers;
