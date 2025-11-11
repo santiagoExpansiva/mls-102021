@@ -170,7 +170,7 @@ export function onServer(server: IServer) {
     if (!server.iframe.contentWindow) return;
 
     channel.onmessage = async (event) => {
-        debugger;
+
         const ev = event.data as RequestMsgBase;
         if (ev.server !== server.name || ev.type !== "fetch-request") return;
 
