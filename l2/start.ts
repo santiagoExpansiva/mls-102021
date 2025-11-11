@@ -11,7 +11,7 @@ let body = document.querySelector('body') as HTMLElement;
 
 export async function start(project: number, startServers: 'all' | 'none' | string = 'none') {
 
-    if (listItens) return;
+    if (listItens.length > 0) return; 
     await loadEsbuild();
     const m = await getProjectConfig(project);
     const array: IListItem[] = [];
