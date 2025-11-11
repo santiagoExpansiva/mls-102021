@@ -9,9 +9,11 @@ export let listItens: IListItem[] = [];
 let div = document.createElement('div') as HTMLElement;
 let body = document.querySelector('body') as HTMLElement;
 
+let channel = new BroadcastChannel('collab');
+
 export async function start(project: number, startServers: 'all' | 'none' | string = 'none') {
 
-    if (listItens.length > 0) return; 
+    if (listItens.length > 0) return;
     await loadEsbuild();
     const m = await getProjectConfig(project);
     const array: IListItem[] = [];
@@ -38,13 +40,13 @@ async function loadIframes(startServers: 'all' | 'none' | string) {
 
 
     for await (let info of listItens) {
-        createServer(info,  startServers === 'all' || startServers === info.name)
+        createServer(info, startServers === 'all' || startServers === info.name)
 
     }
 
 }
 
-function createServer(info: IListItem,  start: boolean): void {
+function createServer(info: IListItem, start: boolean): void {
 
     if (iframes[info.server]) return
 
@@ -167,7 +169,37 @@ export function onServer(server: IServer) {
 
     if (!server.iframe.contentWindow) return;
 
-    server.iframe.contentWindow.onmessage = async (e) => {
+    channel.onmessage = async (event) => {
+        debugger;
+        const ev = event.data as RequestMsgBase;
+        if (ev.server !== server.name || ev.type !== "fetch-request") return;
+
+        const res: ResponseMsgBase = {
+            type: "fetch-response",
+            id: ev.id,
+            body: '',
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+        }
+
+        const method = 'exec';
+        if (server.iframe && (server.iframe.contentWindow as any)[method]) {
+
+            const exec = (server.iframe.contentWindow as any)[method];
+            const strJson = ev.options ? ev.options : '{}';
+            const resposta = await exec(JSON.parse(strJson));
+            res.body = JSON.stringify(resposta)
+
+            channel.postMessage(res);
+
+        }
+
+
+
+    };
+
+
+    /*server.iframe.contentWindow.onmessage = async (e) => {
 
         const data = e.data;
         console.info('message', data);
@@ -195,12 +227,12 @@ export function onServer(server: IServer) {
             }
         }
 
-    };
+    };*/
 
 }
 
 export function restartServer(server: IServer) {
-    
+
     const item = listItens.find((i, index) => i.server === server.server);
     if (iframes[server.server]) {
         iframes[server.server].iframe.remove();
@@ -221,6 +253,17 @@ export function offServer(server: IServer) {
 
 }
 
+
+interface RequestMsgBase {
+    type: "fetch-request",
+    server: string,
+    url: string,
+    id: string,
+    options: string,
+    headers: any
+
+}
+
 interface ResponseMsgBase {
     type: "fetch-response",
     id: string,
@@ -237,7 +280,7 @@ interface IListItem {
 }
 
 export interface IServer {
-    icon:string | undefined,
+    icon: string | undefined,
     name: string,
     server: string,
     iframe: HTMLIFrameElement,
