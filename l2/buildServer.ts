@@ -106,6 +106,7 @@ async function compileWithEsbuild(info: IJSONDependence, storFile: mls.stor.IFil
             write: false,
             format: "esm",
             loader: { ".ts": "ts" },
+            minify: true,
             plugins: [getVirtualFilesPlugin(virtualFiles)]
         });
 
