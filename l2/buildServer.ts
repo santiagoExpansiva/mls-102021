@@ -6,7 +6,7 @@ import { createStorFile, IReqCreateStorFile } from './_100554_collabLibStor';
 let esBuild: any;
 export const DISTFOLDER = 'wwwroot';
 
-export async function build(info: InfoBuild):Promise<string> {
+export async function build(info: InfoBuild): Promise<string> {
     try {
         await loadEsbuild();
         const ret = await buildServer(info);
@@ -56,7 +56,7 @@ async function buildServer(info: InfoBuild): Promise<string> {
         importsMap: ['"lit": "https://cdn.jsdelivr.net/gh/lit/dist@3/all/lit-all.min.js"', '"lit/decorators.js": "https://cdn.jsdelivr.net/npm/lit@3.0.0/decorators/+esm"']
     } as IJSONDependence
 
-    const bundle =  await compileWithEsbuild(ret, actualFile);
+    const bundle = await compileWithEsbuild(ret, actualFile);
 
     if (!bundle) throw new Error(`[buildServer]: Build returned empty result`);
     return bundle
@@ -80,9 +80,9 @@ async function compileWithEsbuild(info: IJSONDependence, storFile: mls.stor.IFil
 
             const sf = mls.stor.files[p];
             if (!sf || sf.level !== 1 || sf.extension != '.ts' || sf.project !== storFile.project) return '';
-
-            if (!needCompile || (storDist && new Date(sf.updatedAt || '') > new Date(storDist.updatedAt || ''))) needCompile = true;
-
+            
+            if (storDist && new Date(sf.updatedAt || '') > new Date(storDist.updatedAt || '')) needCompile = true;
+            
             const verify = `/_${sf.project}_${sf.folder ? sf.folder + '/' : ''}${sf.shortName}`;
             const name = './' + (sf.folder ? sf.folder + '/' : '') + sf.shortName + '.js';
 
@@ -94,6 +94,7 @@ async function compileWithEsbuild(info: IJSONDependence, storFile: mls.stor.IFil
 
         }).join("\n").trim();
 
+        console.info(needCompile)
         if (!needCompile) return await storDist.getContent() as string;
 
         const result = await esBuild.build({
@@ -186,9 +187,9 @@ function getVirtualFilesPlugin(files: Record<string, string>) {
     };
 }
 
-async function generateOutput(project:number, srcBuild:string) {
-    
-    const newDistFolder =  `${DISTFOLDER}` ;
+async function generateOutput(project: number, srcBuild: string) {
+
+    const newDistFolder = `${DISTFOLDER}`;
     let storFilesDist = getDistStorFile(project);
     if (!storFilesDist) storFilesDist = await createStorFileOutput({ project, shortName: 'serverRunTime', folder: newDistFolder, ext: '.js' }, srcBuild);
     else await mls.stor.localStor.setContent(storFilesDist, { contentType: 'string', content: srcBuild });
@@ -196,12 +197,12 @@ async function generateOutput(project:number, srcBuild:string) {
 
 }
 
-function getDistStorFile(project:number) {
-    const newDistFolder =  `${DISTFOLDER}`;
+function getDistStorFile(project: number) {
+    const newDistFolder = `${DISTFOLDER}`;
     const keyToDistJs = mls.stor.getKeyToFiles(project, 1, 'serverRunTime', newDistFolder, '.js');
     let storFileDistJs = mls.stor.files[keyToDistJs];
     return storFileDistJs
-    
+
 }
 
 async function createStorFileOutput(data: { project: number, shortName: string, folder: string, ext: string }, source: string) {
