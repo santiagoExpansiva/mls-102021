@@ -25,9 +25,18 @@ class User implements UserBase {
 
     //-----------IMPLEMENTS------------
 
+    private getTable():UserRecord[] {
+        return (window as any).table && (window as any).table.users ? (window as any).table.users : [];
+    }
+
+    private setTable(array:UserRecord[]) {
+        if ((window as any).table) (window as any).table.users = array;
+        else (window as any).table = {users: array}
+    }
+
     private async saveUserRecord(data: UserRecord): Promise<UserRecord> {
 
-        const store = (window as any).users ? (window as any).users : [];
+        const store = this.getTable();
 
         data.version = Date.now().toString();
 
@@ -39,23 +48,26 @@ class User implements UserBase {
                 if (store[index]) store[index] = data;
             }
 
+            this.setTable(store);
             resolve(data);
         });
     }
 
     private async getAllUserRecord(): Promise<UserRecord[]> {
 
-        const store = (window as any).users ? (window as any).users : [];
+        const store = this.getTable();
 
         return new Promise((resolve, reject) => { resolve(store as UserRecord[]); });
     }
 
     private async deleteUserRecord(id: number): Promise<boolean> {
-        const store = (window as any).users ? (window as any).users : [];
+        const store = this.getTable();
 
         const index = store.findIndex((i: UserRecord) => i.id === id);
 
         if (store[index]) store.splice(index, 1);
+        
+        this.setTable(store);
         return new Promise((resolve, reject) => { resolve(true); });
     }
 

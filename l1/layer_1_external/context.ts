@@ -1,6 +1,6 @@
 /// <mls shortName="context" project="102021" folder="layer_1_external" enhancement="_blank" groupName="layer_1_external" />
 
-import { userIndexedDB } from "./indexedDB/user.js";    
+import { userLocalDB } from "./localDB/user.js";    
 import { Ctx } from "../common/local.js";
 import { RequestBase } from "../global.js"; 
 
@@ -11,7 +11,7 @@ export function createContext(param: RequestBase): Ctx {
     const ctx: Ctx = {
 
         io: {
-            user: userIndexedDB
+            user: userLocalDB
         }
     }
 
