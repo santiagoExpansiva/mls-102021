@@ -7,11 +7,15 @@ import {
     notifyTaskChange,
     notifyThreadChange,
     updateStepStatus,
+    getNextPendentStep,
+    getNextPendingStepByAgentName
 } from "./_100554_aiAgentHelper";
 
 import {
     startNewAiTask,
+    startNewInteractionInAiTask,
     executeNextStep,
+    addNewStep
 } from "./_100554_aiAgentOrchestration";
 
 import { addFile } from './_102021_agentEndpointHelper'
@@ -47,11 +51,23 @@ export function createAgent(): IAgent {
 const _beforePrompt = async (context: mls.msg.ExecutionContext): Promise<void> => {
     const taskTitle = "Planning...";
     if (!context || !context.message) throw new Error("Invalid context");
-    if (context.task) throw new Error("this agent cannot execute with anothers agentes")
-    let prompt = context.message.content.replace('@@agentEndpointLayer1localDB', '').trim();
-    const inputs: any = await getPrompts(prompt);
-    await startNewAiTask(agentName, taskTitle, context.message.content, context.message.threadId, context.message.senderId, inputs, context, _afterPrompt);
-    return;
+    if (!context.task) {
+        let prompt = context.message.content.replace('@@agentEndpointLayer1localDB', '').trim();
+        const inputs: any = await getPrompts(prompt);
+        await startNewAiTask(agentName, taskTitle, context.message.content, context.message.threadId, context.message.senderId, inputs, context, _afterPrompt);
+        return;
+    }
+
+    const pageMemory = context.task?.iaCompressed?.longMemory as any;
+    if (!pageMemory || !pageMemory.info) throw new Error(`[${agentName}]: Not found page memory `);
+
+    const step: mls.msg.AIAgentStep | null = getNextPendingStepByAgentName(context.task, agentName);
+    if (!step) throw new Error(`[${agentName}] beforePrompt: No pending step found for this agent.`);
+
+    context = await updateStepStatus(context, step.stepId, "in_progress");
+    const data = pageMemory.info;
+    const inputs = await getPrompts(data);
+    await startNewInteractionInAiTask(agentName, taskTitle, inputs, context, _afterPrompt, step.stepId);
 }
 
 const _afterPrompt = async (context: mls.msg.ExecutionContext): Promise<void> => {
@@ -62,7 +78,29 @@ const _afterPrompt = async (context: mls.msg.ExecutionContext): Promise<void> =>
 
     await addFile(context);
     notifyTaskChange(context);
-    await executeNextStep(context);
+    await nextStep(context);
+}
+
+async function nextStep(context: mls.msg.ExecutionContext) {
+    if (!context.task) throw new Error(`[${agentName}]: nextStep not found task`);
+    const step = getNextPendentStep(context.task) as mls.msg.AIPayload | null;
+
+    if (!step || step.type !== 'flexible' || !step.result) throw new Error(`[${agentName}]: ` + 'Invalid step in update defs, type: "' + step?.type + '"');
+
+
+    const newStep: mls.msg.AIPayload = {
+        agentName: 'agentEndpointLayer1Context',
+        prompt: 'ok',
+        status: 'pending',
+        stepId: step.stepId + 1,
+        interaction: null,
+        nextSteps: null,
+        rags: null,
+        type: 'agent'
+    }
+
+    await addNewStep(context, step.stepId, [newStep]);
+
 }
 
 async function getPrompts(userPrompt: string): Promise<mls.msg.IAMessageInputType[]> {
