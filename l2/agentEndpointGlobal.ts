@@ -1,4 +1,4 @@
-/// <mls shortName="agentEndpointLayer1Context" project="102021" enhancement="_blank" />
+/// <mls shortName="agentEndpointGlobal" project="102021" enhancement="_blank" />
 
 import { IAgent, svg_agent } from './_100554_aiAgentBase';
 import { getPromptByHtml } from './_100554_aiPrompts';
@@ -20,14 +20,14 @@ import {
 
 import { addFile } from './_102021_agentEndpointHelper'
 
-const agentName = "agentEndpointLayer1Context";
+const agentName = "agentEndpointGlobal";
 const project = 102021;
 
 export function createAgent(): IAgent {
     return {
         agentName,
         avatar_url: svg_agent,
-        agentDescription: "Agent agentEndpointLayer1Context, for create tipe context",
+        agentDescription: "Agent agentEndpointGlobal, for create tipe context",
         visibility: "private",
         async beforePrompt(context: mls.msg.ExecutionContext): Promise<void> {
             return _beforePrompt(context);
@@ -52,7 +52,7 @@ const _beforePrompt = async (context: mls.msg.ExecutionContext): Promise<void> =
     const taskTitle = "Planning...";
     if (!context || !context.message) throw new Error("Invalid context");
     if (!context.task) {
-        let prompt = context.message.content.replace('@@agentEndpointLayer1Context', '').trim();
+        let prompt = context.message.content.replace('@@agentEndpointGlobal', '').trim();
         const inputs: any = await getPrompts(prompt);
         await startNewAiTask(agentName, taskTitle, context.message.content, context.message.threadId, context.message.senderId, inputs, context, _afterPrompt);
         return;
@@ -88,7 +88,7 @@ async function nextStep(context: mls.msg.ExecutionContext) {
     if (!step || step.type !== 'flexible' || !step.result) throw new Error(`[${agentName}]: ` + 'Invalid step in update defs, type: "' + step?.type + '"');
 
     const newStep: mls.msg.AIPayload = {
-        agentName: 'agentEndpointGlobal',
+        agentName: 'agentEndpointCommonLocal',
         prompt: 'ok',
         status: 'pending',
         stepId: step.stepId + 1,
@@ -118,7 +118,7 @@ async function getPrompts(userPrompt: string): Promise<mls.msg.IAMessageInputTyp
 
 async function getContext() {
 
-    const key = mls.stor.getKeyToFiles(mls.actualProject || 0, 1, 'context', 'layer_1_external', '.ts');
+    const key = mls.stor.getKeyToFiles(mls.actualProject || 0, 1, 'global', '', '.ts');
 
     if (!mls.stor.files[key]) return '';
 

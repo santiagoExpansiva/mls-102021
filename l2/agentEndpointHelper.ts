@@ -5,7 +5,10 @@ import {
     updateStepStatus,
 } from "./_100554_aiAgentHelper";
 
-export async function addFile(context: mls.msg.ExecutionContext, updStatus:boolean = false) {
+import { createStorFile, IReqCreateStorFile } from './_100554_collabLibStor';
+import { createModel } from './_100554_collabLibModel'
+
+export async function addFile(context: mls.msg.ExecutionContext, updStatus: boolean = false) {
 
     if (!context || !context.task) throw new Error('Not found context to create files');
     const step = getNextPendentStep(context.task);
@@ -20,18 +23,30 @@ export async function addFile(context: mls.msg.ExecutionContext, updStatus:boole
 
     const info = mls.l2.getPath(`_${prj}_${content.nameFile}`);
 
-    console.info('----------------------------------------------');
-    console.info(content.source);
-    console.info('----------------------------------------------');
-
     const keys = mls.stor.getKeyToFiles(info.project, 1, info.shortName, info.folder, '.ts');
+
     if (mls.stor.files[keys]) {
-        console.info('atualizar');
+
+        const m = await createModel(mls.stor.files[keys], false, false);
+        if (m) m.model.setValue(content.source);
+        
     } else {
-        console.info('criar')
+
+        const req: IReqCreateStorFile = {
+            shortName: info.shortName,
+            project: info.project,
+            folder: info.folder,
+            level: 1,
+            source: content.source,
+            extension: '.ts',
+            status: 'new',
+        }
+
+        await createStorFile(req, true, false, false);
+
+
     }
 
-    if(updStatus) context = await updateStepStatus(context, step.stepId, "completed");
-
+    if (updStatus) context = await updateStepStatus(context, step.stepId, "completed");
 
 }
