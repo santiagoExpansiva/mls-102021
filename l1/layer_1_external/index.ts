@@ -11,3 +11,7 @@ export async function exec(param: RequestBase): Promise<ResponseBase> {
     
     
 }
+
+export function teste() {
+    console.info('a2');
+}
