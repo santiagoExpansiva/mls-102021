@@ -23,7 +23,7 @@ export interface ResponseBase{
     error?:string
 }
 
-type ActionTypes = 'addUser' | 'uppUser' |  'delUser' | 'listUser';
+type ActionTypes = 'addUser' | 'uppUser' |  'delUser' | 'listUser' | 'listAudit';
 
 //----------REQUEST--------------
 
@@ -45,4 +45,9 @@ export interface RequestUserDelById extends RequestBase {
 export interface RequestUserGetList extends RequestBase {
   action: 'listUser',
   params: { filter: string }
+}
+
+export interface RequestAuditList extends RequestBase {
+  action: 'listAudit',
+  params:  { filter: string }
 }
