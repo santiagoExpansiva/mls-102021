@@ -1,13 +1,13 @@
 /// <mls shortName="user" project="102021" folder="layer_1_external/localDB" enhancement="_blank" groupName="layer_1_external/localDB" />
 
 import { UserBase } from "../../layer_4_entities/userBase.js";
-import { UserRecord } from "../../layer_4_entities/user.js";       
+import { UserRecord } from "../../layer_4_entities/user.js";
 
 class User implements UserBase {
 
     //-----------METHODS-----------
 
-    public async upd(param: UserRecord): Promise<UserRecord> { 
+    public async upd(param: UserRecord): Promise<UserRecord> {
         return await this.saveUserRecord(param);
     }
 
@@ -25,13 +25,13 @@ class User implements UserBase {
 
     //-----------IMPLEMENTS------------
 
-    private getTable():UserRecord[] {
+    private getTable(): UserRecord[] {
         return (window as any).table && (window as any).table.users ? (window as any).table.users : [];
     }
 
-    private setTable(array:UserRecord[]) {
+    private setTable(array: UserRecord[]) {
         if ((window as any).table) (window as any).table.users = array;
-        else (window as any).table = {users: array}
+        else (window as any).table = { users: array }
     }
 
     private async saveUserRecord(data: UserRecord): Promise<UserRecord> {
@@ -42,7 +42,10 @@ class User implements UserBase {
 
         return new Promise((resolve, reject) => {
 
-            if (!data.id) { store.push(data); }
+            if (!data.id) {
+                data.id = this.getNextId(store);
+                store.push(data);
+            }
             else {
                 const index = store.findIndex((i: UserRecord) => i.id === data.id);
                 if (store[index]) store[index] = data;
@@ -66,12 +69,17 @@ class User implements UserBase {
         const index = store.findIndex((i: UserRecord) => i.id === id);
 
         if (store[index]) store.splice(index, 1);
-        
+
         this.setTable(store);
         return new Promise((resolve, reject) => { resolve(true); });
     }
 
-    
+    private getNextId(arr:UserRecord[]) {
+        if (!arr || arr.length === 0) return 1; // se o array estiver vazio, começa do 1
+
+        const lastId = Math.max(...arr.map(item => item.id || 0));
+        return lastId + 1;
+    }
 
 }
 

@@ -14,8 +14,9 @@ export async function listUser(ctx: Ctx, data: Record<string, any> | undefined):
     }
 
     try {
-
-        ret.data = await layer3.listUser(ctx);
+    
+        if (!data) throw new Error('listUser');
+        ret.data = await layer3.listUser(ctx, data.filter || '');
         return ret;
 
     } catch (e: any) {

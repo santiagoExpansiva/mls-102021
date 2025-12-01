@@ -6,7 +6,13 @@ export interface UserRecord {
   version?: string
 }
 
-export interface UserDetails { 
-    name: string,
-    password: string
+export interface UserDetails {
+  name: string,
+  password: string,
+  cpf:string,
+}
+
+export interface UserIndexRecord{
+  fullText: string,
+  id: number,
 }

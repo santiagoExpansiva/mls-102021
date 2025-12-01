@@ -6,6 +6,7 @@ import { addUser } from "./addUser.js";
 import { uppUser } from "./uppUser.js"; 
 import { delUser } from "./delUser.js"; 
 import { listUser } from "./listUser.js"; 
+import { listAudit } from "./listAudit.js"; 
 
 export async function exec(ctx:Ctx ,param: RequestBase): Promise<ResponseBase> { 
 
@@ -19,7 +20,7 @@ export async function exec(ctx:Ctx ,param: RequestBase): Promise<ResponseBase> {
 
     const args = param.params || undefined; 
 
-    console.info('executou server:' + param.action)
+    console.info('executou server: 7' + param.action)
 
     switch (param.action) { 
 
@@ -27,6 +28,7 @@ export async function exec(ctx:Ctx ,param: RequestBase): Promise<ResponseBase> {
         case ('uppUser'): return await uppUser(ctx, args);
         case ('delUser'): return await delUser(ctx, args);
         case ('listUser'): return await listUser(ctx, args);
+        case ('listAudit'): return await listAudit(ctx, args);
 
         default: return {
             statusCode: 400,
