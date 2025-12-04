@@ -1,9 +1,11 @@
-/// <mls shortName="bteste" project="102021" enhancement="_blank" />
+/// <mls shortName="bteste" project="102021" enhancement="_100554_enhancementLit" />
 
 
 import { IAteste } from '/_102021_ateste';
+import { customElement } from 'lit/decorators.js';
 
-class bteste{
+@customElement('bteste-102021')
+export class Bteste extends IAteste{
 
-    private teste: IAteste | undefined;
+
 }
