@@ -2,8 +2,8 @@
 
 import { html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { StateLitElement } from '_100554_/l2/stateLitElement';
-import { addOrUpdateEndPoint } from './aiIntegrationHub';
+import { StateLitElement } from '/_100554_/l2/stateLitElement.js';
+import { addOrUpdateEndPoint } from '/_102021_/l2/aiIntegrationHub.js';
 
 @customElement('teste-agent-102021')
 export class ExampleCqrs extends StateLitElement {
