@@ -1,8 +1,7 @@
 /// <mls shortName="aiIntegrationHub" project="102021" enhancement="_blank" />
 
-import { createThread } from "./_100554_collabMessageHelper";
-import { getThreadByName } from './_100554_msgDBController';
-import { addMessage, getUserId } from './_100554_collabMessageHelper'
+import { createThread, addMessage, getUserId} from "/_102025_/l2/collabMessagesHelper.js";
+import { getThreadByName } from '/_102025_/l2/collabMessagesIndexedDB.js';
 
 export async function addOrUpdateEndPoint(action: string, intent: string, interfaceRequest: string, interfaceResponse: string, mock: string | undefined) {
 
