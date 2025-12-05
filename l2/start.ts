@@ -1,7 +1,7 @@
 /// <mls shortName="start" project="102021" enhancement="_blank" />
 
-import { getProjectConfig } from './_100554_libCommom';
-import { build, InfoBuild, loadEsbuild } from './_102021_buildServer';
+import { getProjectConfig } from '/_100554_/l2/libCommom.js';
+import { build, InfoBuild, loadEsbuild } from '/_102021_/l2/buildServer.js';
 
 let iframes: Record<string, IServer> = {};
 export let servers: Record<string, IServer> = {};

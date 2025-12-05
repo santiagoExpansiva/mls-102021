@@ -1,7 +1,7 @@
 /// <mls shortName="buildServer" project="102021" enhancement="_blank" />
 
-import { IJSONDependence } from './_100554_libCompile';
-import { createStorFile, IReqCreateStorFile } from './_100554_collabLibStor';
+import { IJSONDependence } from '/_100554_/l2/libCompile.js';
+import { createStorFile, IReqCreateStorFile } from '/_100554_/l2/collabLibStor.js';
 
 let esBuild: any;
 export const DISTFOLDER = 'wwwroot';

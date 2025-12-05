@@ -3,7 +3,7 @@
 
 import { html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { StateLitElement } from '_100554_/l2/stateLitElement';
+import { StateLitElement } from '/_100554_/l2/stateLitElement.js';
 import { UserRecord } from "_102021_/l1/global"; 
 
 

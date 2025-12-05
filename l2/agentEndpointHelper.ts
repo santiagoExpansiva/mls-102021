@@ -3,10 +3,10 @@
 import {
     getNextPendentStep,
     updateStepStatus,
-} from "./_100554_aiAgentHelper";
+} from "/_100554_/l2/aiAgentHelper.js";
 
-import { createStorFile, IReqCreateStorFile } from './_100554_collabLibStor';
-import { createModel } from './_100554_collabLibModel'
+import { createStorFile, IReqCreateStorFile } from '/_100554_/l2/collabLibStor.js';
+import { createModel } from '/_100554_/l2/collabLibModel.js'
 
 export async function addFile(context: mls.msg.ExecutionContext, updStatus: boolean = false) {
 

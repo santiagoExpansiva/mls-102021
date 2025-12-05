@@ -1,7 +1,7 @@
 /// <mls shortName="agentEndpointLayer4Entity" project="102021" enhancement="_blank" />
 
-import { IAgent, svg_agent } from './_100554_aiAgentBase';
-import { getPromptByHtml } from './_100554_aiPrompts';
+import { IAgent, svg_agent } from '/_100554_/l2/aiAgentBase.js';
+import { getPromptByHtml } from '/_100554_/l2/aiPrompts.js';
 import {
     getNextInProgressStepByAgentName,
     notifyTaskChange,
@@ -9,16 +9,16 @@ import {
     updateStepStatus,
     getNextPendentStep,
     getNextPendingStepByAgentName
-} from "./_100554_aiAgentHelper";
+} from "/_100554_/l2/aiAgentHelper.js";
 
 import {
     startNewAiTask,
     startNewInteractionInAiTask,
     executeNextStep,
     addNewStep
-} from "./_100554_aiAgentOrchestration";
+} from "/_100554_/l2/aiAgentOrchestration.js";
 
-import { addFile } from './_102021_agentEndpointHelper'
+import { addFile } from '/_102021_/l2/agentEndpointHelper.js'
 
 const agentName = "agentEndpointLayer4Entity";
 const project = 102021;

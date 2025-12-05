@@ -1,7 +1,7 @@
 /// <mls shortName="agentEndpoint" project="102021" enhancement="_blank" />
 
-import { IAgent, svg_agent } from './_100554_aiAgentBase';
-import { getPromptByHtml } from './_100554_aiPrompts';
+import { IAgent, svg_agent } from '/_100554_/l2/aiAgentBase.js';
+import { getPromptByHtml } from '/_100554_/l2/aiPrompts.js';
 import {
     getNextInProgressStepByAgentName,
     notifyTaskChange,
@@ -9,13 +9,13 @@ import {
     updateStepStatus,
     getNextPendentStep,
     appendLongTermMemory
-} from "./_100554_aiAgentHelper";
+} from "/_100554_/l2/aiAgentHelper.js";
 
 import {
     startNewAiTask,
     executeNextStep,
     addNewStep
-} from "./_100554_aiAgentOrchestration";
+} from "/_100554_/l2/aiAgentOrchestration.js";
 
 
 const agentName = "agentEndpoint";

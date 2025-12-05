@@ -1,9 +1,9 @@
 /// <mls shortName="liveServer" project="102021" enhancement="_100554_enhancementLit" />
 
 import { html, repeat, unsafeHTML } from 'lit';
-import { customElement, property, state, query } from 'lit/decorators.js';
-import { CollabLitElement } from './_100554_collabLitElement';
-import { servers,  onServer, offServer, restartServer, IServer} from './_102021_start';
+import { customElement, property, state, query } from 'lit/decorators.js'; 
+import { CollabLitElement } from '/_100554_/l2/collabLitElement.js';
+import { servers,  onServer, offServer, restartServer, IServer} from '/_102021_/l2/start.js'; 
 
 @customElement('live-server-102021')
 export class ServicePreviewL1ListServer extends CollabLitElement {
