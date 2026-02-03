@@ -1,4 +1,4 @@
-/// <mls shortName="agentEndpointHelper" project="102021" enhancement="_blank" />
+/// <mls fileReference="_102021_/l2/agentEndpointHelper.ts" enhancement="_blank" />
 
 import {
     getNextPendentStep,
