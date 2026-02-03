@@ -1,4 +1,4 @@
-/// <mls shortName="aiIntegrationHub" project="102021" enhancement="_blank" />
+/// <mls fileReference="_102021_/l2/aiIntegrationHub.ts" enhancement="_blank" />
 
 import { createThread, addMessage, getUserId} from "/_102025_/l2/collabMessagesHelper.js";
 import { getThreadByName } from '/_102025_/l2/collabMessagesIndexedDB.js';
