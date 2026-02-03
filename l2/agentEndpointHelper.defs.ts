@@ -1,2 +1,2 @@
-/// <mls shortName="agentEndpointHelper" project="102021" enhancement="_blank" folder="" />
+/// <mls fileReference="_102021_/l2/agentEndpointHelper.defs.ts" enhancement="_blank" />
 

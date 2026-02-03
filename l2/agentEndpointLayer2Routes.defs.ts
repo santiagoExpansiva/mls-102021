@@ -1,2 +1,2 @@
-/// <mls shortName="agentEndpointLayer2Routes" project="102021" enhancement="_blank" folder="" />
+/// <mls fileReference="_102021_/l2/agentEndpointLayer2Routes.defs.ts" enhancement="_blank" />
 

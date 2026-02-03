@@ -1,4 +1,4 @@
-/// <mls shortName="testUser" project="102021" enhancement="_100554_enhancementLit" />
+/// <mls fileReference="_102021_/l2/testUser.ts" enhancement="_100554_enhancementLit" />
 
 
 import { html, css } from 'lit';

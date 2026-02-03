@@ -1,4 +1,4 @@
-/// <mls shortName="module" project="102021" enhancement="_blank" folder="example" />
+/// <mls fileReference="_102021_/l2/example/module.ts" enhancement="_blank" />
 
 export const moduleConfig = {
   theme: "default",

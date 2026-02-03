@@ -1,4 +1,4 @@
-/// <mls shortName="buildServer" project="102021" enhancement="_blank" />
+/// <mls fileReference="_102021_/l2/buildServer.ts" enhancement="_blank" />
 
 import { IJSONDependence } from '/_100554_/l2/libCompile.js';
 import { createStorFile, IReqCreateStorFile } from '/_100554_/l2/collabLibStor.js';
