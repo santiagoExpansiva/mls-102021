@@ -1,4 +1,4 @@
-/// <mls shortName="start" project="102021" enhancement="_blank" />
+/// <mls fileReference="_102021_/l2/start.ts" enhancement="_blank" />
 
 import { getProjectConfig } from '/_100554_/l2/libCommom.js';
 import { build, InfoBuild, loadEsbuild } from '/_102021_/l2/buildServer.js';
