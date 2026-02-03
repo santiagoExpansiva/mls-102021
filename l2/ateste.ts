@@ -1,4 +1,4 @@
-/// <mls shortName="ateste" project="102021" enhancement="_blank" />
+/// <mls fileReference="_102021_/l2/ateste.ts" enhancement="_blank" />
 
 
 export class IAteste extends HTMLElement{
