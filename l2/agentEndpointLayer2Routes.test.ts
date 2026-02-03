@@ -1,4 +1,4 @@
-/// <mls shortName="agentEndpointLayer2Routes" project="102021" enhancement="_blank" folder="" />
+/// <mls fileReference="_102021_/l2/agentEndpointLayer2Routes.test.ts" enhancement="_blank" />
 
  import { ICANTest, ICANIntegration, ICANSchema  } from '/_100554_/l2/tsTestAST.js';
  export const integrations: ICANIntegration[] = [];
