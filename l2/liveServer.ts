@@ -1,4 +1,4 @@
-/// <mls shortName="liveServer" project="102021" enhancement="_100554_enhancementLit" />
+/// <mls fileReference="_102021_/l2/liveServer.ts" enhancement="_100554_enhancementLit" />
 
 import { html, repeat, unsafeHTML } from 'lit';
 import { customElement, property, state, query } from 'lit/decorators.js'; 

@@ -1,2 +1,2 @@
-/// <mls shortName="liveServer" project="102021" enhancement="_blank" folder="" />
+/// <mls fileReference="_102021_/l2/liveServer.defs.ts" enhancement="_blank" />
 
