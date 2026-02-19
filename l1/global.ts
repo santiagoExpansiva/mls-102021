@@ -1,4 +1,4 @@
-/// <mls shortName="global" project="102021" folder="" enhancement="_blank" groupName="" />
+/// <mls fileReference="_102021_/l1/global.ts" enhancement="_blank" />
 
 import { UserRecord } from "./layer_4_entities/user.js";
 

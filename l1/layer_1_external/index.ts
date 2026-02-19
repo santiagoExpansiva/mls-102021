@@ -1,4 +1,4 @@
-/// <mls shortName="index" project="102021" folder="layer_1_external" enhancement="_blank" groupName="layer_1_external" />
+/// <mls fileReference="_102021_/l1/layer_1_external/index.ts" enhancement="_blank" />
 
 import { RequestBase, ResponseBase } from "../global.js";
 import { createContext } from "./context.js";   

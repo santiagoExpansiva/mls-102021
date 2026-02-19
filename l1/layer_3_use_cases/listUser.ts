@@ -1,4 +1,4 @@
-/// <mls shortName="listUser" project="102021" folder="layer_3_use_cases" enhancement="_blank" groupName="layer_3_use_cases" />
+/// <mls fileReference="_102021_/l1/layer_3_use_cases/listUser.ts" enhancement="_blank" />
 
 import { UserRecord } from "../layer_4_entities/user.js";
 import { Ctx } from "../common/local.js";

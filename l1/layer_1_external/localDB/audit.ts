@@ -1,4 +1,4 @@
-/// <mls shortName="audit" project="102021" folder="layer_1_external/localDB" enhancement="_blank" groupName="layer_1_external/localDB" />
+/// <mls fileReference="_102021_/l1/layer_1_external/localDB/audit.ts" enhancement="_blank" />
 
 import { AuditBase } from "../../layer_4_entities/auditBase.js";
 import { AuditRecord } from "../../layer_4_entities/audit.js";

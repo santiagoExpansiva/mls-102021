@@ -1,4 +1,4 @@
-/// <mls shortName="user" project="102021" folder="layer_1_external/dynamoDB" enhancement="_blank" groupName="layer_1_external/dynamoDB" />
+/// <mls fileReference="_102021_/l1/layer_1_external/dynamoDB/user.ts" enhancement="_blank" />
 
 import { UserIndexRecord } from "../../layer_4_entities/user.js";       
 

@@ -1,4 +1,4 @@
-/// <mls shortName="delUser" project="102021" folder="layer_2_controllers" enhancement="_blank" groupName="layer_2_controllers" />
+/// <mls fileReference="_102021_/l1/layer_2_controllers/delUser.ts" enhancement="_blank" />
 
 import * as layer3 from "../layer_3_use_cases/delUser.js";
 import { Ctx } from "../common/local.js";
