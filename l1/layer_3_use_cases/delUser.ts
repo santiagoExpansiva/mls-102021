@@ -1,4 +1,4 @@
-/// <mls shortName="delUser" project="102021" folder="layer_3_use_cases" enhancement="_blank" groupName="layer_3_use_cases" />
+/// <mls fileReference="_102021_/l1/layer_3_use_cases/delUser.ts" enhancement="_blank" />
 
 import { Ctx } from "../common/local.js";
 import { AuditRecord } from "../layer_4_entities/audit.js";

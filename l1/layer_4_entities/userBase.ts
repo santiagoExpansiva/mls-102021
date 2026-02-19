@@ -1,4 +1,4 @@
-/// <mls shortName="userBase" project="102021" folder="layer_4_entities" enhancement="_blank" groupName="layer_4_entities" />
+/// <mls fileReference="_102021_/l1/layer_4_entities/userBase.ts" enhancement="_blank" />
 
 import { UserRecord, UserIndexRecord } from "./user.js";    
 

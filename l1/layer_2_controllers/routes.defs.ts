@@ -1,4 +1,4 @@
-/// <mls shortName="routes" project="102021" enhancement="_blank" folder="layer_2_controllers" />
+/// <mls fileReference="_102021_/l1/layer_2_controllers/routes.defs.ts" enhancement="_blank" />
 
 export const routesDefinition = [
     {

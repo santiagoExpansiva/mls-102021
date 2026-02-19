@@ -1,4 +1,4 @@
-/// <mls shortName="user" project="102021" folder="layer_4_entities" enhancement="_blank" groupName="layer_4_entities" />
+/// <mls fileReference="_102021_/l1/layer_4_entities/user.ts" enhancement="_blank" />
 
 export interface UserRecord {
   id?: number,
