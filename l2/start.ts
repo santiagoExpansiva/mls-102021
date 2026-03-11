@@ -2,6 +2,8 @@
 
 import { getProjectConfig } from '/_100554_/l2/libCommom.js';
 import { build, InfoBuild, loadEsbuild } from '/_102021_/l2/buildServer.js';
+import { getPath} from '/_102027_/l2/utils.js';
+
 
 let iframes: Record<string, IServer> = {};
 export let servers: Record<string, IServer> = {};
@@ -93,7 +95,8 @@ export async function setHtml(server: IServer) {
 
     if (!server.iframe.contentDocument) return;
 
-    const path = mls.l2.getPath(server.server);
+    const path = getPath(server.server);
+    if (!path) throw new Error('[]Not found path:' + server.server);
 
     let txt = `
     <collab-console-l1-100554 file="${server.server}"></collab-console-l1-100554>
