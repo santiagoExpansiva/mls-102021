@@ -7,6 +7,7 @@ import {
 
 import { createStorFile, IReqCreateStorFile } from '/_100554_/l2/collabLibStor.js';
 import { createModel } from '/_100554_/l2/collabLibModel.js'
+import { getPath } from '/_102027_/l2/utils.js'
 
 export async function addFile(context: mls.msg.ExecutionContext, updStatus: boolean = false) {
 
@@ -21,7 +22,8 @@ export async function addFile(context: mls.msg.ExecutionContext, updStatus: bool
 
     const prj = mls.actualProject || 0;
 
-    const info = mls.l2.getPath(`_${prj}_${content.nameFile}`);
+    const info = getPath(`_${prj}_${content.nameFile}`);
+    if (!info) throw new Error('[]Not found path:' + `_${prj}_${content.nameFile}`);
 
     const keys = mls.stor.getKeyToFiles(info.project, 1, info.shortName, info.folder, '.ts');
 
