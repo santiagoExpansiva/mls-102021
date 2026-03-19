@@ -1,6 +1,6 @@
 /// <mls fileReference="_102021_/l2/start.ts" enhancement="_blank" />
 
-import { getProjectConfig } from '/_100554_/l2/libCommom.js';
+import { getProjectConfig } from '/_102027_/l2/libCommom.js';
 import { build, InfoBuild, loadEsbuild } from '/_102021_/l2/buildServer.js';
 import { getPath} from '/_102027_/l2/utils.js';
 
