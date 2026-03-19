@@ -1,6 +1,6 @@
 /// <mls fileReference="_102021_/l2/designSystem.ts" enhancement="_blank" />
 
-import { IDesignSystemTokens } from '/_100554_/l2/designSystemBase.js';
+import { IDesignSystemTokens } from '/_102027_/l2/designSystemBase.js';
 
 export const tokens: IDesignSystemTokens[] = [
     {
