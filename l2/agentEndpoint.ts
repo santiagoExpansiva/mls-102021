@@ -1,21 +1,15 @@
 /// <mls fileReference="_102021_/l2/agentEndpoint.ts" enhancement="_blank" />
 
-import { IAgent, svg_agent } from '/_100554_/l2/aiAgentBase.js';
-import { getPromptByHtml } from '/_100554_/l2/aiPrompts.js';
+import { IAgent, svg_agent } from '/_102027_/l2/aiAgentBase.js';
+
 import {
     getNextInProgressStepByAgentName,
     notifyTaskChange,
     notifyThreadChange,
-    updateStepStatus,
     getNextPendentStep,
     appendLongTermMemory
-} from "/_100554_/l2/aiAgentHelper.js";
+} from "/_102027_/l2/aiAgentHelper.js";
 
-import {
-    startNewAiTask,
-    executeNextStep,
-    addNewStep
-} from "/_100554_/l2/aiAgentOrchestration.js";
 
 
 const agentName = "agentEndpoint";
@@ -52,7 +46,7 @@ const _beforePrompt = async (context: mls.msg.ExecutionContext): Promise<void> =
     if (context.task) throw new Error("this agent cannot execute with anothers agentes")
     let prompt = context.message.content.replace('@@agentEndpoint', '').trim();
     const inputs: any = await getPrompts(prompt);
-    await startNewAiTask(agentName, taskTitle, context.message.content, context.message.threadId, context.message.senderId, inputs, context, _afterPrompt);
+    //await startNewAiTask(agentName, taskTitle, context.message.content, context.message.threadId, context.message.senderId, inputs, context, _afterPrompt);
     return;
 }
 
@@ -62,7 +56,7 @@ const _afterPrompt = async (context: mls.msg.ExecutionContext): Promise<void> =>
     if (!step) throw new Error(`[${agentName}] afterPrompt: No in progress interaction found.`);
     
     await nextStep(context);
-    context = await updateStepStatus(context, step.stepId, "completed");
+    //context = await updateStepStatus(context, step.stepId, "completed");
 
 }
 
@@ -87,7 +81,7 @@ async function nextStep(context: mls.msg.ExecutionContext) {
         type: 'agent'
     }
 
-    await addNewStep(context, step.stepId, [newStep]);
+    //await addNewStep(context, step.stepId, [newStep]);
 
 }
 
@@ -98,8 +92,8 @@ async function getPrompts(userPrompt:string): Promise<mls.msg.IAMessageInputType
         context: await getRoutes(),
     }
 
-    const prompts = await getPromptByHtml({ project, shortName: agentName, folder: '', data: dataForReplace })
-    return prompts;
+    //const prompts = await getPromptByHtml({ project, shortName: agentName, folder: '', data: dataForReplace })
+    return [];
 }
 
 async function getRoutes() {
