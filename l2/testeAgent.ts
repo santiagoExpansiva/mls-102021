@@ -2,7 +2,7 @@
 
 import { html } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
-import { StateLitElement } from '/_100554_/l2/stateLitElement.js';
+import { StateLitElement } from '/_102027_/l2/stateLitElement.js';
 import { addOrUpdateEndPoint } from '/_102021_/l2/aiIntegrationHub.js';
 
 @customElement('teste-agent-102021')

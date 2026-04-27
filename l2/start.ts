@@ -96,7 +96,7 @@ export async function setHtml(server: IServer) {
     if (!server.iframe.contentDocument) return;
 
     const path = getPath(server.server);
-    if (!path) throw new Error('[]Not found path:' + server.server);
+    if (!path) throw new Error('[]Not found path:' + server.server); 
 
     let txt = `
     <collab-console-l1-100554 file="${server.server}"></collab-console-l1-100554>
