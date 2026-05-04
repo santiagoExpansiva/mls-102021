@@ -1,6 +1,8 @@
 /// <mls fileReference="_102021_/l2/liveServer.ts" enhancement="_102027_/l2/enhancementLit" />
 
-import { html, repeat, unsafeHTML } from 'lit';
+import { html } from 'lit';
+import { repeat } from 'lit/directives/repeat.js';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { customElement, property, state, query } from 'lit/decorators.js'; 
 import { CollabLitElement } from '/_102027_/l2/collabLitElement.js';
 import { servers,  onServer, offServer, restartServer, IServer} from '/_102021_/l2/start.js'; 
