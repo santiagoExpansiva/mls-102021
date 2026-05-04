@@ -4,7 +4,7 @@
 import { html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { StateLitElement } from '/_102027_/l2/stateLitElement.js';
-import { UserRecord } from "_102021_/l1/global"; 
+import { UserRecord } from "/_102021_/l1/global"; 
 
 
 const pendingRequests: Record<string, any> = {};
