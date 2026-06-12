@@ -1,8 +1,9 @@
 # Backend architecture — layer contract (client modules)
 
 Reference for any LLM/agent that materializes client-module backend code from `.defs.ts` planning
-artifacts. Per-layer generation guidelines: `layer_1.md`, `layer_2.md`, `layer_3.md`, `layer_4.md`.
-Diagram: `docs/l1_en.svg` (pt-BR: `docs/l1_br.svg`).
+artifacts. Per-layer generation guidelines: `layer_1.md`, `layer_2.md`, `layer_3.md`, `layer_4.md`
+(this folder: `mls-102021/l2/skills/`, moved from `mls-102034/skills/` on 2026-06-12).
+Diagram: `mls-102034/docs/l1_en.svg` (pt-BR: `mls-102034/docs/l1_br.svg`).
 
 ## The four layers
 
