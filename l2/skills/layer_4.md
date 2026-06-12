@@ -66,9 +66,7 @@ export const DealEntity: IDealEntity = { /* ... */ };
   `ITableRepository` operations (`findOne/findMany/findManyByValues/insert/upsert/update/delete`).
   `orderBy` is ALWAYS `{ field: 'created_at', direction: 'desc' }` — never `{created_at:'desc'}`.
 - `getById` throws `AppError('NOT_FOUND', ..., 404, { id })` when missing.
-- Ids: `ctx.idGenerator.newId()` — **never** `ctx.idGenerator()` (not callable directly).
-- Timestamps: `ctx.clock.nowIso()` — **never** `ctx.clock.now()` or `ctx.clock()`.
-- Insert: `await repo.insert({ record })` — the argument key is `record`, **never** `data`.
+- Ids: `ctx.idGenerator`; timestamps: `ctx.clock`.
 
 ## details (JSONB) handling
 

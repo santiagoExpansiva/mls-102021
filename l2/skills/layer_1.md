@@ -22,39 +22,11 @@ not here.
 ## Output
 
 For kinds 1 and 2: `l1/{module}/layer_1_external/{tableId}.ts` exporting
-`export const {tableId}TableDef: TableDefinition = {...}`.
-
-**Every generated file MUST start with the triple-slash MLS header**, then the import:
+`export const {tableId}TableDef: TableDefinition = {...}` with:
 
 ```ts
-/// <mls fileReference="_{project}_/l1/{module}/layer_1_external/{tableId}.ts" enhancement="_blank" />
 import type { TableDefinition } from '/_102034_/l1/server/layer_1_external/persistence/contracts.js';
-
-export const menuCategoryTableDef: TableDefinition = {
-  moduleId: 'cafeFlow',
-  repositoryName: 'cafeFlowMenuCategory',
-  tableName: 'menu_category',
-  purpose: 'transacao',
-  description: 'Menu category master data',
-  backupHot: false,
-  storageProfile: 'postgres',
-  writeMode: 'sync',
-  version: 1,
-  columns: [
-    { name: 'menu_category_id', postgresType: 'UUID',        nullable: false },
-    { name: 'name',             postgresType: 'VARCHAR',     nullable: false },
-    { name: 'is_active',        postgresType: 'BOOLEAN',     nullable: false, defaultSql: 'true' },
-    { name: 'created_at',       postgresType: 'TIMESTAMPTZ', nullable: false, defaultSql: 'NOW()' },
-  ],
-  primaryKey: ['menu_category_id'],
-  indexes: [{ name: 'idx_menu_category_active', columns: ['is_active'] }],
-};
 ```
-
-The `TableColumnDefinition` interface has these fields:
-`name` (string), `postgresType` (string), `nullable` (boolean, optional),
-`defaultSql` (string, optional), `description` (string, optional).
-The field is `postgresType` — **never** `type`.
 
 ## Mapping rules (defs → TableDefinition)
 
@@ -64,9 +36,8 @@ The field is `postgresType` — **never** `type`.
 - `tableKind: 'metricTimeseries'` → `purpose: 'controle'`, `storageProfile: 'postgres'`,
   `writeMode: 'sync'`, `backupHot: false`, plus
   `timescale: { hypertable: { timeColumn, chunkTimeInterval } }` from the defs hypertable block.
-- Column field is `postgresType` (**never** `type`): uuid→`'UUID'`, text→`'TEXT'`,
-  int/integer→`'INTEGER'`, decimal/numeric→`'NUMERIC'`, timestamptz→`'TIMESTAMPTZ'`,
-  date→`'DATE'`, time→`'TIME'`, boolean→`'BOOLEAN'`, jsonb→`'JSONB'`, varchar→`'VARCHAR'`.
+- Column types: uuid→UUID, text→TEXT, int/integer→INTEGER, decimal/numeric→NUMERIC,
+  timestamptz→TIMESTAMPTZ, date→DATE, time→TIME, boolean→BOOLEAN, jsonb→JSONB.
 - `nullable` from the defs column; `defaultSql` when the defs declares a default
   (timestamps → `"NOW()"`).
 - `detailsColumn.enabled: true` → ensure a `details JSONB` nullable column exists.
@@ -98,10 +69,3 @@ The field is `postgresType` — **never** `type`.
 5. Every column traces back to a field in the owning layer_4 entity defs (derivation L4 → L1);
    a column with no corresponding entity field is a planning error — report it, do not invent
    a field.
-6. All column objects use `postgresType`, **not** `type` — the TypeScript compiler rejects `type`.
-7. File starts with `/// <mls fileReference="..." enhancement="_blank" />` on the very first line.
-
-## Output encoding rules
-
-- **Server contracts import always uses `102034`**: `'/_102034_/l1/server/layer_1_external/persistence/contracts.js'` — never the module's own project number.
-- **Newlines in the JSON `srcFile` value**: use `\n` (single backslash-n). Do **not** use `\\n` (double backslash) — that writes a literal `\n` into the saved file instead of a real newline.
