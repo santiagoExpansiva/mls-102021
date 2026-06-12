@@ -73,3 +73,12 @@ generator can import without guessing:
 2. Every import from layer_4 corresponds to an `entityRefs` entry.
 3. Every command has its function + exported input/output types.
 4. Multi-table writes are inside one transaction.
+5. The `AppError`/`RequestContext` import path starts with `/_102034_/` — never the module's own project number.
+
+## Output encoding rules
+
+- **Server contracts ALWAYS use project `102034`** — the correct import is exactly:
+  `import { AppError, type RequestContext } from '/_102034_/l1/server/layer_2_controllers/contracts.js';`
+  Never substitute the module's own project number for `102034`. This path is fixed infrastructure and does not vary per module.
+- **Layer_4 entity imports use the MODULE'S project number** taken from `User info.project` (e.g. `/_102043_/l1/{module}/layer_4_entities/{Entity}.js`). Only the contracts/server imports are pinned to `102034`.
+- **Newlines in the JSON `srcFile` value**: use `\n` (single backslash-n). Do **not** use `\\n` (double backslash) — that writes a literal `\n` text into the saved file instead of an actual newline character.
