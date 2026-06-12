@@ -59,3 +59,12 @@ Plus one router entry per command:
 2. `grep ctx.data` returns nothing; no layer_4/layer_1 imports.
 3. All usecase types are imported, not redeclared.
 4. Router keys unique, pattern `{moduleName}.{pageId}.{commandName}`.
+5. The `ok`/`AppError`/`BffHandler` import path starts with `/_102034_/` — never the module's own project number.
+
+## Output encoding rules
+
+- **Server contracts ALWAYS use project `102034`** — the correct import is exactly:
+  `import { ok, AppError, type BffHandler } from '/_102034_/l1/server/layer_2_controllers/contracts.js';`
+  Never substitute the module's own project number for `102034`. This path is fixed infrastructure and does not vary per module.
+- **Layer_3 usecase imports use the MODULE'S project number** taken from `User info.project` (e.g. `/_102043_/l1/{module}/layer_3_usecases/{usecase}.js`). Only the server/contracts import is pinned to `102034`.
+- **Newlines in the JSON `srcFile` value**: use `\n` (single backslash-n). Do **not** use `\\n` (double backslash) — that writes a literal `\n` text into the saved file instead of an actual newline character.
