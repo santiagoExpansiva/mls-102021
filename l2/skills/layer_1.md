@@ -25,6 +25,7 @@ For kinds 1 and 2: `l1/{module}/layer_1_external/{tableId}.ts` exporting
 `export const {tableId}TableDef: TableDefinition = {...}` with:
 
 ```ts
+/// <mls fileReference="_{project}_/l1/{module}/layer_1_external/{tableId}.ts" enhancement="_blank" />
 import type { TableDefinition } from '/_102034_/l1/server/layer_1_external/persistence/contracts.js';
 ```
 
