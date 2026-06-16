@@ -27,11 +27,15 @@ operations or business rules — rules live in layer_3.
 
 ## Output file skeleton
 
-`l1/{module}/layer_4_entities/{className}.ts` (className/contractName come from
-`materialization`):
+`l1/{module}/layer_4_entities/{fileName}.ts` — use **`materialization.fileName`** (camelCase, lowercase
+first letter) for the file path and `fileReference`. Use `materialization.className` only for
+TypeScript class/interface names inside the file. Never use `className` as the filename.
+
+Example: `materialization.fileName = "dealEntity"` → file is `dealEntity.ts`;
+`materialization.className = "DealEntity"` → class name inside the file is `DealEntity`.
 
 ```ts
-/// <mls fileReference="_{project}_/l1/{module}/layer_4_entities/DealEntity.ts" enhancement="_blank" />
+/// <mls fileReference="_{project}_/l1/{module}/layer_4_entities/dealEntity.ts" enhancement="_blank" />
 import { AppError, type RequestContext } from '/_102034_/l1/server/layer_2_controllers/contracts.js';
 import type { IDataRuntime } from '/_102034_/l1/server/layer_1_external/data/runtime.js';
 

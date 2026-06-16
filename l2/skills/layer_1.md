@@ -37,7 +37,7 @@ import type { TableDefinition } from '/_102034_/l1/server/layer_1_external/persi
 - `tableKind: 'metricTimeseries'` → `purpose: 'controle'`, `storageProfile: 'postgres'`,
   `writeMode: 'sync'`, `backupHot: false`, plus
   `timescale: { hypertable: { timeColumn, chunkTimeInterval } }` from the defs hypertable block.
-- Column types: uuid→UUID, text→TEXT, int/integer→INTEGER, decimal/numeric→NUMERIC,
+- Column postgresType: uuid→UUID, text→TEXT, int/integer→INTEGER, decimal/numeric→NUMERIC,
   timestamptz→TIMESTAMPTZ, date→DATE, time→TIME, boolean→BOOLEAN, jsonb→JSONB.
 - `nullable` from the defs column; `defaultSql` when the defs declares a default
   (timestamps → `"NOW()"`).
