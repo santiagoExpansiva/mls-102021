@@ -37,6 +37,9 @@ Plus one router entry per command:
 
 - One exported `BffHandler` const per bffCommand; naming
   `{moduleName}{PascalCase(pageId)}{PascalCase(commandName)}Handler`.
+- **Never add an explicit return type on the async arrow function** — the `BffHandler` type already
+  encodes the return type. Adding `: Promise<XxxOutput>` after the parameter list causes a TypeScript
+  error. Correct: `async ({ ctx }) => {`; Wrong: `async ({ ctx }): Promise<XxxOutput> => {`.
 - **Import the usecase function AND its input/output types from the usecase file** (use the
   defs `implementation` block). NEVER redeclare interfaces that a usecase already exports; declare
   local types only for fields not covered by any usecaseRef.
