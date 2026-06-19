@@ -26,7 +26,7 @@ export const {module}DealDetailAdvanceStageHandler: BffHandler = async ({ reques
   const input = request.params as AdvanceDealStageInput;
   if (!input.dealId) throw new AppError('VALIDATION_ERROR', 'dealId is required', 400, { field: 'dealId' });
   const result = await advanceDealStage(ctx, input);
-  return ok(result);
+  return ok(result); // mutation: return whole result; for queries unwrap: ok(result.fieldName)
 };
 ```
 
@@ -49,8 +49,15 @@ Plus one router entry per command:
 - **Never touch tables or entities**: no `ctx.data.*`, no imports from `layer_1_external` or
   `layer_4_entities`. (The phase-2 exception — trivial read with zero rules calling layer_4
   directly — is DISABLED until the planning defs mark the command for it explicitly.)
-- Response: always `return ok(result)`; errors propagate as `AppError` (the platform serializes
-  `BffResponse.error`).
+- Response: inspect the usecase `OutputType` (available in the imported `.d.ts`).
+  - If the output type wraps data in a **named property** (e.g. `{ itensCardapio: Item[] }`,
+    `{ categorias: Categoria[] }`), unwrap it: `return ok(result.propertyName)`. Use the
+    `output[]` field list from the bffCommand to identify the correct property name.
+  - If the output is a direct entity or a mutation confirmation (the whole object IS the
+    response), use `return ok(result)`.
+  - Rule of thumb: `kind: 'query'` commands almost always wrap a collection → unwrap.
+    `kind: 'command'|'mutation'` commands return entities or confirmations → keep whole.
+  - Errors propagate as `AppError` (the platform serializes `BffResponse.error`).
 - Identifier inputs follow the page defs `pageInputs` contract (routeParam/session sources are
   resolved by the platform shell; the handler reads them from `request.params`).
 - Do not call more than one WRITE usecase per handler — composition of writes is a layer_3
