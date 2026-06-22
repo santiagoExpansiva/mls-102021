@@ -12,6 +12,8 @@ input, calls the usecase and shapes the response — nothing else.
 2. For each `usecaseRefs` entry: the usecase defs `implementation` block
    (`functionName`, `inputTypeName`, `outputTypeName`, `tsFileRef`) written by the layer_3
    generation (see `layer_3.md`).
+3. **The L2 contract file** (`l2/{module}/web/contracts/{pageId}.ts`) — if provided, this is the
+   authoritative shape of every command's Input and Output that the frontend expects.
 
 ## Output file skeleton
 
@@ -46,17 +48,36 @@ Plus one router entry per command:
 - Boundary validation only: required fields, basic shape (`VALIDATION_ERROR`, 400). Business rules
   belong to layer_3 — if you are writing an `if` about state/permissions/limits here, it is in the
   wrong layer.
+- **Business rules from `rulesApplied`**: each command in the definition may carry a `rulesApplied[]`
+  list. When present, read the corresponding rule definitions provided in `## Business Rules` and
+  apply them exactly as described — the rule text is the authoritative source of what the handler
+  must enforce. Rules that belong at the boundary (e.g. input format constraints, enum validation,
+  allowed transition lists) are implemented here; rules that require entity state or persistence
+  belong to layer_3 and must be delegated via the usecase call, not re-implemented in layer_2.
 - **Never touch tables or entities**: no `ctx.data.*`, no imports from `layer_1_external` or
   `layer_4_entities`. (The phase-2 exception — trivial read with zero rules calling layer_4
   directly — is DISABLED until the planning defs mark the command for it explicitly.)
-- Response: inspect the usecase `OutputType` (available in the imported `.d.ts`).
-  - If the output type wraps data in a **named property** (e.g. `{ itensCardapio: Item[] }`,
-    `{ categorias: Categoria[] }`), unwrap it: `return ok(result.propertyName)`. Use the
-    `output[]` field list from the bffCommand to identify the correct property name.
-  - If the output is a direct entity or a mutation confirmation (the whole object IS the
-    response), use `return ok(result)`.
-  - Rule of thumb: `kind: 'query'` commands almost always wrap a collection → unwrap.
-    `kind: 'command'|'mutation'` commands return entities or confirmations → keep whole.
+- **Contract-first response shape**: when the L2 contract file is provided, the value passed to
+  `ok()` **must match the contract's Output type** for that command. Import the contract Output
+  type and use it as the target shape.
+  - Compare the layer_3 output type against the contract Output type field by field.
+  - If the shapes already match, pass the result (or unwrapped property) directly.
+  - If field names differ (e.g. layer_3 returns `order_id`, contract expects `orderId`; or
+    `created_at` vs `createdAt`), build a mapping expression inside the handler to convert
+    before calling `ok()`. Example:
+    ```ts
+    return ok(result.pedidos.map((p) => ({
+      orderId: p.order_id,
+      status: p.status,
+      createdAt: p.created_at,
+      shiftId: p.shift_id,
+    })));
+    ```
+  - If the contract Output is an array type (`OutputItem[]`) and layer_3 wraps the data in a
+    named property, unwrap and map: `result.propertyName.map(item => ({ ...converted }))`.
+- When no contract file is provided, fall back to the previous behaviour: inspect the usecase
+  `OutputType`, unwrap named properties for queries, return whole result for commands/mutations.
+  - Rule of thumb: `kind: 'query'` → unwrap. `kind: 'command'|'mutation'` → keep whole.
   - Errors propagate as `AppError` (the platform serializes `BffResponse.error`).
 - Identifier inputs follow the page defs `pageInputs` contract (routeParam/session sources are
   resolved by the platform shell; the handler reads them from `request.params`).
