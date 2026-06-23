@@ -8,6 +8,7 @@ import {
   listDepLayerPaths,
   extractToolCallArgs,
   extractJsonArrayField,
+  loadModuleByBuild,
 } from '/_102027_/l2/agentMaterializeSolution/artifactsMaterialize.js';
 import type { PipelineItem, L1LayerFolder } from '/_102027_/l2/agentMaterializeSolution/artifactsMaterialize.js';
 
@@ -90,7 +91,11 @@ async function beforePromptStep(
 
   // layer_1_external has no deps — deterministic, no LLM needed
   if (layerFolder === 'layer_1_external') {
-    const item = buildItem(shortName, layerFolder, toMlsPath(project, 1, folder, shortName, '.ts'), project, 1, folder, [], []);
+    const skills = await loadModuleSkills(project, moduleName, SKILL_KEY.layer_1_external);
+    const item = buildItem(shortName, layerFolder, toMlsPath(project, 1, folder, shortName, '.ts'), project, 1, folder, [], [], undefined, {
+      skills,
+      afterSaveBackEnd: AFTER_SAVE_BACKEND.layer_1_external,
+    });
     const ok = await appendPipelineToFile(project, 1, folder, shortName, [item]);
     return [mkDone(context, parentStep, step, hookSequential, ok ? 'completed' : 'failed', ok ? undefined : 'append failed')];
   }
@@ -102,7 +107,13 @@ async function beforePromptStep(
     const usecaseDeps = refs.map(ref => toMlsPath(project, 1, `${moduleName}/layer_3_usecases`, ref, '.d.ts'));
     const contractPath = toMlsPath(project, 2, `${moduleName}/web/contracts`, shortName, '.ts');
     const outputPath = lowerFirstFilename(toMlsPath(project, 1, folder, shortName, '.ts'));
-    const item = buildItem(shortName, layerFolder, outputPath, project, 1, folder, [...usecaseDeps, contractPath], [], rules);
+    const skills = await loadModuleSkills(project, moduleName, SKILL_KEY.layer_2_controllers);
+    const rulesPath = rules.length > 0 ? toMlsPath(project, 5, moduleName, 'rules', '.defs.ts') : undefined;
+    const item = buildItem(shortName, layerFolder, outputPath, project, 1, folder, [...usecaseDeps, contractPath], [], rules, {
+      skills,
+      afterSaveBackEnd: AFTER_SAVE_BACKEND.layer_2_controllers,
+      rulesPath,
+    });
     const ok = await appendPipelineToFile(project, 1, folder, shortName, [item]);
     return [mkDone(context, parentStep, step, hookSequential, ok ? 'completed' : 'failed', ok ? undefined : 'append failed')];
   }
@@ -152,13 +163,40 @@ async function afterPromptStep(
 
   const defsContent = await getFileContent(project, 1, folder, shortName, '.defs.ts');
   const rules = defsContent ? extractJsonArrayField(defsContent, 'rulesApplied') : [];
-  const item = buildItem(shortName, layerFolder, lowerFirstFilename(out.outputPath), project, 1, folder, out.dependsFiles || [], [], rules);
+  const skillKey = SKILL_KEY[layerFolder] ?? 'layer1';
+  const skills = await loadModuleSkills(project, moduleName, skillKey);
+  const rulesPath = rules.length > 0 ? toMlsPath(project, 5, moduleName, 'rules', '.defs.ts') : undefined;
+  const item = buildItem(shortName, layerFolder, lowerFirstFilename(out.outputPath), project, 1, folder, out.dependsFiles || [], [], rules, { skills, rulesPath });
   const ok = await appendPipelineToFile(project, 1, folder, shortName, [item]);
 
   return [mkDone(context, parentStep, step, hookSequential, ok ? 'completed' : 'failed', ok ? undefined : 'append failed', ok ? 'input_output' : undefined)];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const SKILL_KEY: Record<string, string> = {
+  layer_1_external:    'layer1',
+  layer_4_entities:    'layer4',
+  layer_3_usecases:    'layer3',
+  layer_2_controllers: 'layer2',
+};
+
+const AFTER_SAVE_BACKEND: Record<string, string> = {
+  layer_1_external:    '_102021_/l2/agentMaterializeSolution/registerBackEnd.ts?registerLayer1',
+  layer_2_controllers: '_102021_/l2/agentMaterializeSolution/registerBackEnd.ts?registerController',
+};
+
+async function loadModuleSkills(project: number, moduleName: string, skillKey: string): Promise<string[]> {
+  const path = toMlsPath(project, 2, moduleName, 'module', '.ts');
+  const mod = await loadModuleByBuild(path);
+  return mod?.skills?.[skillKey]?.skillPath ?? [];
+}
+
+interface BuildItemOpts {
+  skills?: string[];
+  afterSaveBackEnd?: string;
+  rulesPath?: string;
+}
 
 function buildItem(
   shortName: string,
@@ -170,6 +208,7 @@ function buildItem(
   dependsFiles: string[],
   dependsOn: string[],
   rulesApplied?: string[],
+  opts?: BuildItemOpts,
 ): PipelineItem {
   return {
     id: `${shortName}__${layerFolder}`,
@@ -178,6 +217,9 @@ function buildItem(
     defPath: toMlsPath(project, level, folder, shortName, '.defs.ts'),
     dependsFiles,
     dependsOn,
+    skills: opts?.skills ?? [],
+    ...(opts?.afterSaveBackEnd ? { afterSaveBackEnd: opts.afterSaveBackEnd } : {}),
+    ...(opts?.rulesPath ? { rulesPath: opts.rulesPath } : {}),
     ...(rulesApplied && rulesApplied.length > 0 ? { rulesApplied } : {}),
     agent: 'agentMaterializeGen',
   };
@@ -228,7 +270,7 @@ function buildSystemPrompt(layerFolder: string, depTsPaths: string[]): string {
     layer_3_usecases:    'layer_4_entities (entity .ts files)',
     layer_2_controllers: 'layer_3_usecases (usecase .ts files)',
   };
-  return `<!-- modelType: codeinstruct -->
+  return `<!-- modelType: codeinstruct2 -->
 
 You analyze a ${layerFolder} .defs.ts planning artifact and determine its pipeline item.
 
