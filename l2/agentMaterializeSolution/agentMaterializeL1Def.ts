@@ -186,10 +186,20 @@ const AFTER_SAVE_BACKEND: Record<string, string> = {
   layer_2_controllers: '_102021_/l2/agentMaterializeSolution/registerBackEnd.ts?registerController',
 };
 
+const NEEDS_DEFINITION = new Set(['layer1', 'layer4', 'layer2']);
+
 async function loadModuleSkills(project: number, moduleName: string, skillKey: string): Promise<string[]> {
   const path = toMlsPath(project, 2, moduleName, 'module', '.ts');
   const mod = await loadModuleByBuild(path);
-  return mod?.skills?.[skillKey]?.skillPath ?? [];
+  if (!mod) return [];
+  const base: string[] = mod.skills?.[skillKey]?.skillPath ?? [];
+  if (NEEDS_DEFINITION.has(skillKey)) {
+    const defPaths: string[] = (mod.skills?.definition?.skillPath ?? []).map((p: string) =>
+      /^_\d+_$/.test(p) ? `${p}.d.ts` : p,
+    );
+    return [...base, ...defPaths];
+  }
+  return base;
 }
 
 interface BuildItemOpts {
