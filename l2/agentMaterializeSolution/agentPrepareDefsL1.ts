@@ -7,7 +7,7 @@ import {
   getContentByMlsPath,
   parsePipelineFromContent,
 } from '/_102027_/l2/agentMaterializeSolution/artifactsMaterialize.js';
-import { buildRouterTs, buildPersistenceTs } from '/_102020_/l2/agentMaterializeSolution/templateMaterialize.js';
+import { buildModuleTs, buildRouterTs, buildPersistenceTs, buildConfig } from '/_102021_/l2/agentMaterializeSolution/templateMaterialize.js';
 import { createStorFile, IReqCreateStorFile } from '/_102027_/l2/libStor.js';
 
 declare const mls: any;
@@ -214,8 +214,10 @@ async function ensureFile(ref: string, src: string): Promise<void> {
 }
 
 async function ensureSingletons(project: number, moduleName: string): Promise<void> {
-  await ensureFile(`_${project}_/l1/${moduleName}/layer_2_controllers/router.ts`,   buildRouterTs(project, moduleName));
-  await ensureFile(`_${project}_/l1/${moduleName}/layer_1_external/persistence.ts`, buildPersistenceTs(project, moduleName));
+  await ensureFile(`_${project}_/l2/${moduleName}/module.ts`,                          buildModuleTs(project, moduleName));
+  await ensureFile(`_${project}_/l1/${moduleName}/layer_2_controllers/router.ts`,      buildRouterTs(project, moduleName));
+  await ensureFile(`_${project}_/l1/${moduleName}/layer_1_external/persistence.ts`,    buildPersistenceTs(project, moduleName));
+  await ensureFile(`_${project}_/l0/config.json`,                                      buildConfig(project, moduleName));
 }
 
 // ─── Prompts ──────────────────────────────────────────────────────────────────
