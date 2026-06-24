@@ -69,10 +69,10 @@ async function beforePromptImplicit(
         { type: 'system', content: systemPrompt },
         { type: 'human', content: buildHumanPrompt(summaries) },
       ],
-      taskTitle: 'materialize-l1-defs',
+      taskTitle: 'preparing-l1-defs',
       threadId: context.message.threadId,
       userMessage: context.message.content,
-      longTermMemory: { taskName: 'materialize-l1-defs', flowName: 'materialize-l1-defs' },
+      longTermMemory: { taskName: 'preparing-l1-defs', flowName: 'preparing-l1-defs' },
     },
   };
 
