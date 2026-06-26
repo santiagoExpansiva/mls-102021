@@ -40,12 +40,12 @@ async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.Executio
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   if (!context.task) throw new Error(`[${agent.agentName}] task invalid`);
-  const scanStep = createAgentStepPayload('cb-scan', 'agentCbScanCreateOwners', 'Scan l4 (statusBackend = toCreate)', {}, [], 'sequential', 'waiting_human_input');
+  const scanStep = createAgentStepPayload('cb-scan', 'agentCbScanCreateOwners', 'Scan l4 (statusBackend = toCreate)', { planId: 'cb-scan' }, [], 'sequential', 'waiting_human_input');
   return [createAddStepIntent(context, step, scanStep)];
 }
 
 const systemPrompt = `
-<!-- modelType: codeawsfast -->
+<!-- modelType: codehigh -->
 
 Return only:
 { "type": "result", "result": "ok" }

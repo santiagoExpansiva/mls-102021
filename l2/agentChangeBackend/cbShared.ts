@@ -524,8 +524,12 @@ export function enqueueNext(
   args: unknown = {},
 ): mls.msg.AgentIntentAddStep {
   const dep = planIdOf(currentStep);
-  const next = createAgentStepPayload(planId, agentName, stepTitle, args, dep ? [dep] : [], 'sequential', 'waiting_dependency');
-  return createAddStepIntent(context, parentStep, next);
+  // Unique args per step (embed planId) AND nest under the current step, so the runtime's hook
+  // dispatch key (parentStepId, args) never collides — every chained step lives under a distinct
+  // parent with a distinct prompt. (Mirrors agentPrepareDefsL1's per-child unique selector args.)
+  const mergedArgs = { planId, ...(args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) };
+  const next = createAgentStepPayload(planId, agentName, stepTitle, mergedArgs, dep ? [dep] : [], 'sequential', 'waiting_dependency');
+  return createAddStepIntent(context, currentStep, next);
 }
 
 // ── small parsers ──────────────────────────────────────────────────────────────
