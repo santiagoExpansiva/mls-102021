@@ -68,7 +68,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
 }
 
 const systemPrompt = `
-<!-- modelType: codeawsfast -->
+<!-- modelType: codehigh -->
 <!-- x-tool-strict: true -->
 
 You are ${AGENT_NAME} (hexagonal layer_1_external/adapters/persistence). Derive one TableDefinition
