@@ -7,7 +7,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
   readBackendScan, planTableColumns, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
-  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, asArray, logPrefix,
+  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, asArray, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { persistenceIndexResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -30,7 +30,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   });
   const events = scan.entities.filter(e => e.kind === 'event').map(e => ({ tableId: e.entityId, rootEntity: e.entityId, ownership: e.ownership, appendOnly: true, fields: (e.fields || []).map((f: any) => f.fieldId) }));
   const human = `## Aggregates baseline (indexed columns vs details JSONB)\n${JSON.stringify(baseline, null, 2)}\n\n## Event tables (append-only)\n${JSON.stringify(events, null, 2)}\n\nRefine indexed columns; everything not indexed goes to details. MDM entities produce NO table.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

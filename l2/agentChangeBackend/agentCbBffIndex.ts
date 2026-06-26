@@ -7,7 +7,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
   createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
-  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, parseDefsSource, isRecord, logPrefix,
+  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, parseDefsSource, isRecord, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { bffIndexResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -42,7 +42,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     ];
   }
   const human = `## Page contracts (bffCommands)\n${JSON.stringify(pages, null, 2)}\n\nMap each page to one controller (one handler per command) + route keys {module}.{page}.{command}.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

@@ -9,7 +9,7 @@ import {
   createPromptReadyIntent, createUpdateStatusIntent, enqueueNext, parseDefsSource, isRecord,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, batchSchema, asArray, saveAgentTrace,
   readBackendScan, saveDefs, buildArtifact, buildPipelineItem, httpControllerFileInfo, usecaseFileInfo,
-  dtsRef, layerSkills, readString, lowerFirst, logPrefix,
+  dtsRef, layerSkills, readString, lowerFirst, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { httpControllerResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -47,7 +47,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     ];
   }
   const human = `## Page contracts\n${JSON.stringify(pages, null, 2)}\n\nReturn one controller per page (one handler per command, route key {module}.{page}.{command}); the handler returns EXACTLY the contract Output.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

@@ -8,7 +8,7 @@
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
   readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
-  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, asArray, logPrefix,
+  extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace, asArray, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { aggregateIndexResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -28,7 +28,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     baselineAggregates: scan.aggregates,
   };
   const human = `## Module(s): ${scan.moduleNames.join(', ')}\n\n## Ontology + relationships (data only)\n${JSON.stringify(reduced, null, 2)}\n\nReturn the refined aggregate index.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

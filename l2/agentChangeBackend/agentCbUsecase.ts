@@ -9,7 +9,7 @@ import {
   readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, batchSchema, asArray, saveAgentTrace,
   saveDefs, buildArtifact, buildPipelineItem, usecaseFileInfo, repositoryPortFileInfo, domainEntityFileInfo,
-  dtsRef, layerSkills, readString, readStringArray, lowerFirst, logPrefix,
+  dtsRef, layerSkills, readString, readStringArray, lowerFirst, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { usecaseResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -26,7 +26,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   const roots = new Set(scan.aggregates.map(a => a.rootEntity));
   const items = scan.owners.map(o => ({ usecaseId: o.id, ownerKind: o.kind, entity: o.entity, reads: o.reads, writes: o.writes, rulesApplied: o.rulesApplied, ports: [...new Set([o.entity, ...o.reads, ...o.writes])].filter(id => roots.has(id)) }));
   const human = `## Owners -> usecases (with candidate ports = aggregate roots they touch)\n${JSON.stringify(items, null, 2)}\n\nReturn one usecase per owner: functionName, input/output type names, ports used, rulesApplied, transactional flag, steps.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

@@ -9,7 +9,7 @@ import {
   readBackendScan, planTableColumns, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, batchSchema, asArray, saveAgentTrace,
   saveDefs, buildArtifact, buildPipelineItem, persistenceTableFileInfo, domainEntityFileInfo, dtsRef,
-  layerSkills, readString, lowerFirst, logPrefix,
+  layerSkills, readString, lowerFirst, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { persistenceTableResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -31,7 +31,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     return { tableId: agg.rootEntity, indexed: plan.indexed, detailsFields: plan.details, childCollections: agg.embeddedMembers };
   });
   const human = `## Tables to derive (indexed columns vs details JSONB)\n${JSON.stringify(tables, null, 2)}\n\nReturn one TableDefinition per table: snake_case tableName/columns; only indexed columns are real, the rest live in a details JSONB column (detailsColumn.enabled=true, childCollections listed).`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

@@ -12,7 +12,9 @@ export function createAgent(): IAgentAsync {
 
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   try {
-    const scan = await readBackendScan(['toCreate']);
+    // toCreate is the trigger; inProgress is treated as resumable (a previous run locked but did not
+    // finish) so the reconciler is idempotent and never gets stuck after a partial run.
+    const scan = await readBackendScan(['toCreate', 'inProgress']);
     console.log(`${logPrefix(agent)} project=${scan.project} modules=${scan.moduleNames.join(',') || '(none)'} owners=${scan.owners.length} aggregates=${scan.aggregates.length}`);
     if (scan.owners.length === 0) {
       return [

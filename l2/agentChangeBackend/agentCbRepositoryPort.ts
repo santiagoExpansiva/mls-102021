@@ -8,7 +8,7 @@ import {
   readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, batchSchema, asArray, saveAgentTrace,
   saveDefs, buildArtifact, buildPipelineItem, repositoryPortFileInfo, domainEntityFileInfo, dtsRef,
-  layerSkills, readString, lowerFirst, logPrefix,
+  layerSkills, readString, lowerFirst, logPrefix, planIdOf,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 import { repositoryPortResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.js';
 
@@ -24,7 +24,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   const scan = await readBackendScan(['toCreate', 'inProgress']);
   const items = scan.aggregates.map(a => ({ entityId: a.rootEntity, embeddedMembers: a.embeddedMembers }));
   const human = `## Aggregates\n${JSON.stringify(items, null, 2)}\n\nReturn one repository port (I{Entity}Repository) per aggregate, typed in domain terms.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, '', systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
