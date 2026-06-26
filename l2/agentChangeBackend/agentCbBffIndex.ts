@@ -42,7 +42,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     ];
   }
   const human = `## Page contracts (bffCommands)\n${JSON.stringify(pages, null, 2)}\n\nMap each page to one controller (one handler per command) + route keys {module}.{page}.{command}.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

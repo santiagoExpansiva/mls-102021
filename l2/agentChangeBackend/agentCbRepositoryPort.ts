@@ -24,7 +24,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   const scan = await readBackendScan(['toCreate', 'inProgress']);
   const items = scan.aggregates.map(a => ({ entityId: a.rootEntity, embeddedMembers: a.embeddedMembers }));
   const human = `## Aggregates\n${JSON.stringify(items, null, 2)}\n\nReturn one repository port (I{Entity}Repository) per aggregate, typed in domain terms.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

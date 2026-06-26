@@ -31,7 +31,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     return { tableId: agg.rootEntity, indexed: plan.indexed, detailsFields: plan.details, childCollections: agg.embeddedMembers };
   });
   const human = `## Tables to derive (indexed columns vs details JSONB)\n${JSON.stringify(tables, null, 2)}\n\nReturn one TableDefinition per table: snake_case tableName/columns; only indexed columns are real, the rest live in a details JSONB column (detailsColumn.enabled=true, childCollections listed).`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

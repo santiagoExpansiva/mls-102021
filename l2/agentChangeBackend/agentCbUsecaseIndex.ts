@@ -23,7 +23,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   const owners = scan.owners.map(o => ({ ownerId: o.id, kind: o.kind, entity: o.entity, reads: o.reads, writes: o.writes, rulesApplied: o.rulesApplied }));
   const aggregates = scan.aggregates.map(a => ({ aggregateId: a.aggregateId, rootEntity: a.rootEntity }));
   const human = `## Pending owners (statusBackend != done)\n${JSON.stringify(owners, null, 2)}\n\n## Aggregates (port targets)\n${JSON.stringify(aggregates, null, 2)}\n\nOne usecase per owner; ports = the aggregates it reads/writes.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {

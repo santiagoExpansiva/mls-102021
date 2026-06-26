@@ -28,7 +28,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     baselineAggregates: scan.aggregates,
   };
   const human = `## Module(s): ${scan.moduleNames.join(', ')}\n\n## Ontology + relationships (data only)\n${JSON.stringify(reduced, null, 2)}\n\nReturn the refined aggregate index.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, planIdOf(step), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
