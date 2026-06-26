@@ -12,7 +12,7 @@ interface LogEntry {
   msg: string;
 }
 
-@customElement('service-preview-forge-102021')
+@customElement('preview--service-preview-forge-102021')
 export class ServicePreviewForge102021 extends LitElement {
 
   @state() private running = false;
@@ -21,6 +21,7 @@ export class ServicePreviewForge102021 extends LitElement {
 
   private iframe: HTMLIFrameElement | null = null;
   private esbuild: any;
+  private _logHandler: ((e: MessageEvent) => void) | null = null;
 
   // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,10 @@ export class ServicePreviewForge102021 extends LitElement {
   }
 
   private doStop() {
+    if (this._logHandler) {
+      window.removeEventListener('message', this._logHandler);
+      this._logHandler = null;
+    }
     if (this.iframe) {
       (this.iframe.contentWindow as any).onmessage = null;
       this.iframe.remove();
@@ -88,7 +93,8 @@ export class ServicePreviewForge102021 extends LitElement {
     }
     this.addLog('info', 'Loading esbuild-wasm...');
     (mls as any).esbuildInLoad = true;
-    const mod = await import('https://unpkg.com/esbuild-wasm@0.14.54/esm/browser.min.js');
+    const url = 'https://unpkg.com/esbuild-wasm@0.14.54/esm/browser.min.js';
+    const mod = await import(url);
     await (mod as any).initialize({ wasmURL: 'https://unpkg.com/esbuild-wasm@0.14.54/esbuild.wasm' });
     this.esbuild = mod;
     (mls as any).esbuild = mod;
@@ -108,11 +114,11 @@ export class ServicePreviewForge102021 extends LitElement {
     this.addLog('info', `Routers found: ${routerPaths.map(p => p.split('/')[0]).join(', ')}`);
 
     const virtualFiles = await this.getVirtualFiles(project);
-    const entry = this.buildEntry(routerPaths);
+    const entry = this.buildEntry(routerPaths, project);
 
     try {
       const result = await this.esbuild.build({
-        stdin: { contents: entry, sourcefile: 'forge-entry.ts', resolveDir: '/' },
+        stdin: { contents: entry, sourcefile: 'forge-entry.ts', resolveDir: '/', loader: 'ts' },
         bundle: true,
         write: false,
         format: 'esm',
@@ -137,9 +143,9 @@ export class ServicePreviewForge102021 extends LitElement {
       .map(f => f.folder ? `${f.folder}/${f.shortName}` : f.shortName);
   }
 
-  private buildEntry(routerPaths: string[]): string {
+  private buildEntry(routerPaths: string[], project: number): string {
     const imports = routerPaths
-      .map((p, i) => `import * as _r${i} from './${p}.js';`)
+      .map((p, i) => `import * as _r${i} from '/_${project}_/l1/${p}.js';`)
       .join('\n');
 
     const merge = routerPaths
@@ -169,6 +175,7 @@ _sendLog('info', '[forge] routes registered: ' + allRoutes.size + ' — [' + [..
 (window as any).exec = async function(body: any) {
   const route: string = typeof body === 'string' ? body : (body.route ?? '');
   const params: any   = body.params ?? body;
+  _sendLog('info', '→ ' + route + (Object.keys(params ?? {}).length ? ' ' + JSON.stringify(params) : ''));
   const handler = allRoutes.get(route);
   if (!handler) {
     _sendLog('warn', '[forge] 404 route:', route);
@@ -190,7 +197,7 @@ _sendLog('info', '[forge] routes registered: ' + allRoutes.size + ' — [' + [..
     const out: Record<string, string> = {};
     for (const f of Object.values(mls.stor.files) as any[]) {
       if (!f || f.project !== project || f.level !== 1 || f.extension !== '.ts') continue;
-      const key = ((f.folder ? `${f.folder}/${f.shortName}` : f.shortName) + '.js').toLowerCase();
+      const key = `_${f.project}_/l${f.level}/${f.folder ? f.folder + '/' : ''}${f.shortName}.js`.toLowerCase();
       if (!out[key]) out[key] = (await f.getContent()) as string ?? '';
     }
     return out;
@@ -230,6 +237,14 @@ _sendLog('info', '[forge] routes registered: ' + allRoutes.size + ' — [' + [..
     doc.open();
     doc.write(`<!doctype html><html><body><script type="module">${bundle}<\/script></body></html>`);
     doc.close();
+
+    // Listen for forge-log messages sent from the iframe via parent.postMessage
+    this._logHandler = (e: MessageEvent) => {
+      if (e.source !== iframe.contentWindow) return;
+      if (e.data?.type !== 'forge-log') return;
+      this.addLog(e.data.level ?? 'info', e.data.msg ?? '');
+    };
+    window.addEventListener('message', this._logHandler);
 
     // Register in the global previewL1 registry that servicePreviewView looks up
     if (!(top as any).previewL1) (top as any).previewL1 = {};
