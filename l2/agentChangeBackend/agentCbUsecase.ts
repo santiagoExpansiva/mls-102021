@@ -48,7 +48,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
         ...ports.map(p => dtsRef(repositoryPortFileInfo(module, p))),
         ...ports.map(p => dtsRef(domainEntityFileInfo(module, p))),
       ];
-      const pipeline = [buildPipelineItem(lowerFirst(usecaseId), 'applicationUsecase', fi, dependsFiles, layerSkills('layer_3.md'), { rulesApplied: readStringArray(item.rulesApplied) })];
+      const pipeline = [buildPipelineItem(lowerFirst(usecaseId), 'applicationUsecase', fi, dependsFiles, layerSkills('applicationUsecase.md'), { rulesApplied: readStringArray(item.rulesApplied) })];
       await saveDefs(fi, `${lowerFirst(usecaseId)}Usecase`, buildArtifact('usecase', usecaseId, module, AGENT_NAME, item), pipeline);
       saved++;
     }

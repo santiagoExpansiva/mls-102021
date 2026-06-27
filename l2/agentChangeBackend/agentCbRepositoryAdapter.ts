@@ -6,7 +6,7 @@
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
-  readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
+  readBackendScan, planTableColumns, createPromptReadyIntent, createUpdateStatusIntent, enqueueNext,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, batchSchema, asArray, saveAgentTrace,
   saveDefs, buildArtifact, buildPipelineItem, repositoryAdapterFileInfo, repositoryPortFileInfo,
   persistenceTableFileInfo, domainEntityFileInfo, dtsRef, layerSkills, readString, lowerFirst, logPrefix, planIdOf,
@@ -23,8 +23,19 @@ export function createAgent(): IAgentAsync {
 
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   const scan = await readBackendScan(['toCreate', 'inProgress']);
-  const items = scan.aggregates.map(a => ({ entityId: a.rootEntity, embeddedMembers: a.embeddedMembers, mdmRefs: a.mdmRefs }));
-  const human = `## Aggregates (root + embedded + mdm refs)\n${JSON.stringify(items, null, 2)}\n\nReturn one adapter per aggregate implementing I{Entity}Repository: map domain <-> row (columns + details JSONB), resolve mdmRefs via 102034. ctx.data ONLY here.`;
+  const entityIds = new Set(scan.entities.map(e => e.entityId));
+  const byId = new Map(scan.entities.map(e => [e.entityId, e]));
+  const items = scan.aggregates.map(a => {
+    const plan = planTableColumns(byId.get(a.rootEntity)?.fields || [], entityIds);
+    return {
+      entityId: a.rootEntity,
+      embeddedMembers: a.embeddedMembers, // -> inside details JSONB
+      mdmRefs: a.mdmRefs,
+      columns: plan.indexed.map(c => c.fieldId), // real columns (snake_case at the table)
+      detailsFields: plan.details,               // -> inside details JSONB
+    };
+  });
+  const human = `## Aggregates (column vs details split + embedded + mdm refs)\n${JSON.stringify(items, null, 2)}\n\nReturn one adapter per aggregate implementing I{Entity}Repository: map domain <-> row — only "columns" are real columns (snake_case), "detailsFields" + "embeddedMembers" go inside the details JSONB; resolve mdmRefs via 102034. ctx.data ONLY here.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
@@ -47,7 +58,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
         dtsRef(persistenceTableFileInfo(module, entityId)),
         dtsRef(domainEntityFileInfo(module, entityId)),
       ];
-      const pipeline = [buildPipelineItem(`${lowerFirst(entityId)}RepositoryAdapter`, 'repositoryAdapter', fi, dependsFiles, layerSkills('layer_4.md'))];
+      const pipeline = [buildPipelineItem(`${lowerFirst(entityId)}RepositoryAdapter`, 'repositoryAdapter', fi, dependsFiles, layerSkills('repositoryAdapter.md'))];
       await saveDefs(fi, `${lowerFirst(entityId)}RepositoryAdapter`, buildArtifact('repositoryAdapter', `${entityId}RepositoryAdapter`, module, AGENT_NAME, item), pipeline);
       saved++;
     }

@@ -46,7 +46,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       const entityId = readString(item.entityId);
       if (!entityId) continue;
       const fi = domainEntityFileInfo(module, entityId);
-      const pipeline = [buildPipelineItem(lowerFirst(entityId), 'domainEntity', fi, [], layerSkills('layer_4.md'))];
+      const pipeline = [buildPipelineItem(lowerFirst(entityId), 'domainEntity', fi, [], layerSkills('domainEntity.md'))];
       await saveDefs(fi, `${lowerFirst(entityId)}DomainEntity`, buildArtifact('domainEntity', entityId, module, AGENT_NAME, item), pipeline);
       saved++;
     }

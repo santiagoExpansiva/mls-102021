@@ -42,7 +42,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       if (!entityId) continue;
       const fi = repositoryPortFileInfo(module, entityId);
       const dependsFiles = [dtsRef(domainEntityFileInfo(module, entityId))];
-      const pipeline = [buildPipelineItem(`${lowerFirst(entityId)}Repository`, 'repositoryPort', fi, dependsFiles, layerSkills('layer_3.md'))];
+      const pipeline = [buildPipelineItem(`${lowerFirst(entityId)}Repository`, 'repositoryPort', fi, dependsFiles, layerSkills('repositoryPort.md'))];
       await saveDefs(fi, `${lowerFirst(entityId)}RepositoryPort`, buildArtifact('repositoryPort', `${entityId}Repository`, module, AGENT_NAME, item), pipeline);
       saved++;
     }

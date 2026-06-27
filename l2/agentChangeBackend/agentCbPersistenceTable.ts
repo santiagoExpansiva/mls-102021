@@ -49,7 +49,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       if (!tableId) continue;
       const fi = persistenceTableFileInfo(module, tableId);
       const dependsFiles = [dtsRef(domainEntityFileInfo(module, tableId))];
-      const pipeline = [buildPipelineItem(lowerFirst(tableId), 'persistenceTable', fi, dependsFiles, layerSkills('layer_1.md'), { afterSaveBackEnd: REGISTER })];
+      const pipeline = [buildPipelineItem(lowerFirst(tableId), 'persistenceTable', fi, dependsFiles, layerSkills('persistenceTable.md'), { afterSaveBackEnd: REGISTER })];
       await saveDefs(fi, `${lowerFirst(tableId)}TableDefinition`, buildArtifact('table', tableId, module, AGENT_NAME, item), pipeline);
       saved++;
     }

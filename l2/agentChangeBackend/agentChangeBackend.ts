@@ -29,26 +29,34 @@ export function createAgent(): IAgentAsync {
   };
 }
 
-/** Parse the user prompt into a CLI command (the agent mention is stripped). */
+/** Parse the user prompt into a CLI command. Lenient: the agent mention is stripped and the keyword
+ * is matched anywhere (with or without a leading slash), so small formatting differences still work. */
 function parseCommand(raw: string | undefined): CbCommandKind {
   let t = String(raw || '').toLowerCase();
   t = t.replace(/@@?[a-z0-9_]*changebackend/g, ' ').trim();   // drop @@changeBackend / @@agentChangeBackend
-  if (t.startsWith('/rebuild') || t === 'rebuild all' || t === 'rebuild') return 'rebuild';
-  if (t.startsWith('/run') || t === 'run') return 'run';
+  if (/\brebuild\b/.test(t)) return 'rebuild';
+  if (/\brun\b/.test(t)) return 'run';
   return 'help';
 }
 
 async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.ExecutionContext, userPrompt: string): Promise<mls.msg.AgentIntent[]> {
-  const cmd = parseCommand(userPrompt || context.message.content);
+  const raw = userPrompt || context.message.content || '';
+  const cmd = parseCommand(raw);
+  // Diagnostic: confirm what actually arrived and how it was parsed (check the console).
+  console.log(`${logPrefix(agent)} entry userPrompt="${userPrompt}" content="${context.message.content}" -> cmd=${cmd}`);
   let human: string;
 
   if (cmd === 'rebuild') {
-    const scan = await readBackendScan(ALL_STATUSES);
     let reset = 0;
-    for (const owner of scan.owners) {
-      if (await setOwnerStatusBackend(owner, 'toCreate')) reset++;
+    try {
+      const scan = await readBackendScan(ALL_STATUSES);
+      for (const owner of scan.owners) {
+        if (await setOwnerStatusBackend(owner, 'toCreate')) reset++;
+      }
+      console.log(`${logPrefix(agent)} /rebuild — reset ${reset} owner(s) -> toCreate`);
+    } catch (e) {
+      console.error(`${logPrefix(agent)} /rebuild reset failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-    console.log(`${logPrefix(agent)} /rebuild all — reset ${reset}/${scan.owners.length} owner(s) -> toCreate`);
     human = `**/rebuild all** — ${reset} owner(s) reset to \`statusBackend = toCreate\`. Regenerating the whole backend (files are overwritten in place). Acompanhe os steps abaixo.`;
   } else if (cmd === 'run') {
     human = `**/run** — generating the backend for pending owners (\`statusBackend = toCreate | inProgress\`). Acompanhe os steps abaixo.`;

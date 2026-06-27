@@ -66,6 +66,7 @@ export interface CbOwner {
   id: string;
   title: string;
   entity: string;
+  opKind: string;            // operation CRUD/intent kind: create|update|query|view|... (l4 operation.kind)
   reads: string[];
   writes: string[];
   rulesApplied: string[];
@@ -205,6 +206,7 @@ function ownerFrom(
     id,
     title: readString(obj.title) || id,
     entity,
+    opKind: readString(obj.kind),
     reads,
     writes,
     rulesApplied: readStringArray(obj.rulesApplied),
@@ -304,10 +306,14 @@ export function buildArtifact(artifactType: string, artifactId: string, moduleNa
   return { schemaVersion: '2026-06-26', artifactType, artifactId, moduleName, status: 'draft', source: { agentName, stepId: 0, planId: '' }, data };
 }
 
-/** Best-effort layer skill ref for the materialization context (reused 4-layer skills until the
- * hexagonal skills are authored). Always paired with the platform defs. */
+/** Materialization context for a layer: the hexagonal base architecture skill + the per-type skill
+ * (both co-located with this agent) + the platform defs. */
 export function layerSkills(skillFile: string): string[] {
-  return [`_102021_/l2/skills/${skillFile}`, '_102034_.d.ts'];
+  return [
+    '_102021_/l2/agentChangeBackend/skills/architecture.md',
+    `_102021_/l2/agentChangeBackend/skills/${skillFile}`,
+    '_102034_.d.ts',
+  ];
 }
 
 export interface CbPipelineItem {
