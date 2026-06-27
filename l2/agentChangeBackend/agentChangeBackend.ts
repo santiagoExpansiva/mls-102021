@@ -71,7 +71,8 @@ async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.Executio
       agentName: agent.agentName,
       inputAI: [
         { type: 'system', content: ECHO_SYSTEM },
-        { type: 'human', content: human },
+        // The human turn IS the final, valid collab-llm envelope; the model just returns it verbatim.
+        { type: 'human', content: JSON.stringify({ type: 'result', result: human }) },
       ],
       taskTitle: 'agentChangeBackend',
       threadId: context.message.threadId,
@@ -96,8 +97,9 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
 const ECHO_SYSTEM = `
 <!-- modelType: codeawsfast -->
 
-You are a CLI front-end. Output the user-turn text EXACTLY as given (verbatim, same Markdown), with no
-additions, no commentary, no tool calls.
+The user turn contains a single JSON object (a valid collab-llm result envelope, e.g.
+{"type":"result","result":"..."}). Return that JSON object EXACTLY and ONLY it — raw JSON, no code
+fences, no extra text, no tool calls.
 `;
 
 const HELP = `**agentChangeBackend — CLI**
