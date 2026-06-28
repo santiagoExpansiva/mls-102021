@@ -24,6 +24,7 @@ export function createAgent(): IAgentAsync {
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   const scan = await readBackendScan(['toCreate', 'inProgress']);
   const roots = new Set(scan.aggregates.map(a => a.rootEntity));
+  const mdmIds = new Set(scan.entities.filter(e => e.kind === 'mdm').map(e => e.entityId)); // master data: no local port, read by id via 102034
   // Embedded child -> its parent aggregate root. An operation on a child entity (e.g. OrderItem inside
   // Order) uses the PARENT's repository port; there is no child port.
   const childToRoot = new Map<string, string>();
@@ -31,7 +32,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
   const byId = new Map(scan.entities.map(e => [e.entityId, e]));
   const fieldsOf = (id: string) => (byId.get(id)?.fields || []).map((f: any) => ({ fieldId: f.fieldId, type: f.type, required: f.required, ...(f.enum ? { enum: f.enum } : {}) }));
   const items = scan.owners.map(o => {
-    const rawRefs = [...new Set([o.entity, ...o.reads, ...o.writes].filter(Boolean))];   // for input/output FIELDS (keep children)
+    const rawRefs = [...new Set([o.entity, ...o.reads, ...o.writes].filter(Boolean))];   // for input/output FIELDS (keep children + mdm)
     const portRefs = [...new Set(rawRefs.map(id => childToRoot.get(id) ?? id))];          // for ports (children -> parent root)
     return {
       usecaseId: o.id,
@@ -42,7 +43,8 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       reads: o.reads,
       writes: o.writes,
       rulesApplied: o.rulesApplied,
-      ports: portRefs.filter(id => roots.has(id)),
+      ports: portRefs.filter(id => roots.has(id) && !mdmIds.has(id)),   // local repository ports (mdm excluded)
+      mdmRefs: rawRefs.filter(id => mdmIds.has(id)),                    // master data: read by id via ctx.data.mdmDocument
       entityFields: Object.fromEntries(rawRefs.map(id => [id, fieldsOf(id)])), // source for input/output fields (incl. child)
     };
   });
@@ -60,6 +62,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     const scan = await readBackendScan(['toCreate', 'inProgress']);
     const module = scan.moduleNames[0] || 'unknown';
     const roots = new Set(scan.aggregates.map(a => a.rootEntity));
+    const mdmIds = new Set(scan.entities.filter(e => e.kind === 'mdm').map(e => e.entityId));
     const childToRoot = new Map<string, string>();
     for (const a of scan.aggregates) for (const m of a.embeddedMembers) childToRoot.set(m, a.rootEntity);
     const ownerById = new Map(scan.owners.map(o => [o.id, o]));
@@ -68,13 +71,13 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       const usecaseId = readString(item.usecaseId);
       if (!usecaseId) continue;
       // Final ports = union of the model's ports with the deterministic ones (operation entity+writes,
-      // children resolved to their parent root). Guarantees non-empty, correct ports in the saved defs.
+      // children -> parent root), with mdm entities removed (those are read by id via 102034, no port).
       const owner = ownerById.get(usecaseId);
-      const detPorts = owner
-        ? [...new Set([owner.entity, ...owner.reads, ...owner.writes].filter(Boolean).map(id => childToRoot.get(id) ?? id))].filter(id => roots.has(id))
-        : [];
-      const ports = [...new Set([...readStringArray(item.ports), ...detPorts])];
+      const ownerRefs = owner ? [owner.entity, ...owner.reads, ...owner.writes].filter(Boolean) : [];
+      const detPorts = [...new Set(ownerRefs.map(id => childToRoot.get(id) ?? id))].filter(id => roots.has(id) && !mdmIds.has(id));
+      const ports = [...new Set([...readStringArray(item.ports), ...detPorts])].filter(id => !mdmIds.has(id));
       (item as any).ports = ports;
+      (item as any).mdmRefs = [...new Set(ownerRefs.filter(id => mdmIds.has(id)))]; // master-data refs accessed by id
       const fi = usecaseFileInfo(module, usecaseId);
       const dependsFiles = [
         ...ports.map(p => dtsRef(repositoryPortFileInfo(module, p))),
@@ -112,6 +115,10 @@ owner's "entity" is a child embedded in a parent aggregate (its parent is "paren
 from "entity"), the operation works through the PARENT port — load the parent, mutate the embedded child
 in its collection, save the parent. NEVER invent a child repository. "steps" are guidance, not a
 contract: the contract is input/output/ports.
+
+Entities in "mdmRefs" are master data in the shared 102034 store: there is NO port for them — reference
+them BY ID (the id is an input field) and read by id via ctx.data.mdmDocument.get({ mdmId }). Never put
+an mdmRef in ports and never resolveRepository it.
 
 For each usecase return functions[] (usually ONE, named from the operationId; MAY be several with
 different IO). Each function declares EXPLICIT fields:

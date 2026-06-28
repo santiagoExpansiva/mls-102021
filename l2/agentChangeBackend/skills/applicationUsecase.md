@@ -76,6 +76,25 @@ repository**. The defs gives you the parent in `data.ports` / `data.functions[].
 Never call a method like `findByOrderItemId` on the parent port and never import a child port — those do
 not exist. If you need the parent id to locate the child, it is part of the function input.
 
+## MDM references (master data, accessed by id)
+
+Entities listed in `data.mdmRefs` are MDM master data (people, companies, vehicles, menus, categories,
+tables). They live in the shared 102034 MDM store, NOT in this module: there is **no local port, entity
+or table** for them, and you must NEVER `resolveRepository` one. A transaction references them **by id
+only** — the id comes in the function input (e.g. `tableId`, `menuCategoryId`).
+
+Read a master-data record by id via the runtime (the one ctx.data call besides `runInTransaction`):
+
+```ts
+const doc = await ctx.data.mdmDocument.get({ mdmId: input.tableId });
+if (!doc) throw new AppError('NOT_FOUND', `MDM record not found: ${input.tableId}`, 404, { mdmId: input.tableId });
+const table = doc.details; // the master-data payload
+```
+
+`mdmDocument`: `get({ mdmId })`, `getMany({ mdmIds })`, `put({ record })`, `delete({ mdmId })`. Often
+just storing/passing the id is enough — only fetch the record when you actually need its fields. Do not
+import any `/_{project}_/.../ports/{mdm}Repository` — it does not exist.
+
 ## `steps` are guidance, not a contract
 
 `data.steps` (and `data.functions[].steps`) are hints about intent. The CONTRACT you must satisfy is

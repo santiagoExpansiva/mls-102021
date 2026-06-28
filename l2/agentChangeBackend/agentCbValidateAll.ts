@@ -51,6 +51,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     const missing: string[] = [];
     for (const uc of usecases) {
       for (const p of uc.ports) {
+        if (mdmIds.has(p.toLowerCase())) continue;   // mdm = master data read by id via 102034; no local port/entity
         const portSn = `${lowerFirst(p)}Repository`.toLowerCase();
         const domSn = lowerFirst(p).toLowerCase();
         if (!portDefs.has(portSn)) missing.push(`usecase ${uc.id} -> missing port ${lowerFirst(p)}Repository`);
