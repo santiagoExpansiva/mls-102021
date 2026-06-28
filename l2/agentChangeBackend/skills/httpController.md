@@ -1,9 +1,11 @@
 # Skill: httpController → `layer_1_external/adapters/http/controllers/{name}.ts`
 
-Generate the BFF handler(s) — driving HTTP adapter. Each handler validates the boundary input, calls
-the usecase, and shapes the response. NO `ctx.data`, NO persistence/domain-internals import. When a
-per-page frontend contract exists, the response must match its Output exactly; when it does not
-(l4-only generation), the Output defaults to the usecase output. Export one `BffHandler` per command.
+Generate the BFF handler(s) — driving HTTP adapter. **L4 is the source of truth**: generate exactly
+one `BffHandler` per entry in `data.handlers` (each has `command`, `usecaseRef`, `kind`); import the
+usecase named by `usecaseRef` and return its output. The frontend contract is OPTIONAL refinement:
+if `data.outputSource === 'contract'` (and the contract `.ts` is in dependsFiles), map the response to
+the contract Output exactly; otherwise the Output is the usecase output. Each handler validates the
+boundary input only. NO `ctx.data`, NO persistence/domain-internals import.
 
 ## Golden example (compiles)
 

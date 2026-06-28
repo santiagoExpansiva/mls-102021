@@ -1,16 +1,17 @@
 /// <mls fileReference="_102021_/l2/agentChangeBackend/agentChangeBackend.ts" enhancement="_102027_/l2/enhancementAgent"/>
 
 // Stage 3 backend reconciler — ROOT, with a small CLI. v1 is autonomous and create-only.
+// The root LLM is SKIPPED (AgentIntentAddMessageAI.skipRootLLM) — bootstrap is deterministic.
 // Usage (type after the agent mention):
 //   /rebuild all   reset statusBackend of ALL owners -> toCreate, then regenerate (files overwritten
 //                  in place by saveDefs — no manual delete needed)
 //   /run           generate for pending owners (statusBackend = toCreate | inProgress), no reset
-//   /help | other  print help and stop (CLI style)
+//   /help | other  print help (a result step) and stop
 // See spec.md + flow.json in this folder.
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
-  readBackendScan, setOwnerStatusBackend, createAddStepIntent, createAgentStepPayload, createUpdateStatusIntent, logPrefix,
+  readBackendScan, setOwnerStatusBackend, createAgentStepPayload, createUpdateStatusIntent, logPrefix,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 
 const ALL_STATUSES = ['toCreate', 'toUpdate', 'toRemove', 'inProgress', 'done'];
@@ -29,22 +30,48 @@ export function createAgent(): IAgentAsync {
   };
 }
 
-/** Parse the user prompt into a CLI command. Lenient: the agent mention is stripped and the keyword
- * is matched anywhere (with or without a leading slash), so small formatting differences still work. */
+/** Parse the user prompt into a CLI command. Lenient: mention stripped, keyword matched anywhere. */
 function parseCommand(raw: string | undefined): CbCommandKind {
-  let t = String(raw || '').toLowerCase();
-  t = t.replace(/@@?[a-z0-9_]*changebackend/g, ' ').trim();   // drop @@changeBackend / @@agentChangeBackend
+  const t = normalizePrompt(raw);
   if (/\brebuild\b/.test(t)) return 'rebuild';
   if (/\brun\b/.test(t)) return 'run';
   return 'help';
 }
 
+function normalizePrompt(raw: string | undefined): string {
+  return String(raw || '')
+    .trim()
+    .replace(/@@?[a-z0-9_]*changebackend\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
 async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.ExecutionContext, userPrompt: string): Promise<mls.msg.AgentIntent[]> {
   const raw = userPrompt || context.message.content || '';
   const cmd = parseCommand(raw);
-  // Diagnostic: confirm what actually arrived and how it was parsed (check the console).
   console.log(`${logPrefix(agent)} entry userPrompt="${userPrompt}" content="${context.message.content}" -> cmd=${cmd}`);
-  let human: string;
+
+  // The root agent step is created WITHOUT calling the model (skipRootLLM); the chain is added below.
+  const addMessageAI: mls.msg.AgentIntentAddMessageAI = {
+    type: 'add-message-ai',
+    skipRootLLM: true,
+    request: {
+      action: 'addMessageAI',
+      agentName: agent.agentName,
+      inputAI: [
+        { type: 'system', content: 'agentChangeBackend deterministic bootstrap. The root LLM is skipped by AgentIntentAddMessageAI.skipRootLLM.' },
+        { type: 'human', content: normalizePrompt(raw) || 'agentChangeBackend' },
+      ],
+      taskTitle: 'agentChangeBackend',
+      threadId: context.message.threadId,
+      userMessage: context.message.content,
+      longTermMemory: { taskName: 'agentChangeBackend', flowName: 'agentChangeBackend', version: '1', cliCommand: cmd },
+    },
+  };
+
+  if (cmd === 'help') {
+    return [addMessageAI, createBootstrapAddStepIntent(context, createHelpStep())];
+  }
 
   if (cmd === 'rebuild') {
     let reset = 0;
@@ -57,58 +84,49 @@ async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.Executio
     } catch (e) {
       console.error(`${logPrefix(agent)} /rebuild reset failed: ${e instanceof Error ? e.message : String(e)}`);
     }
-    human = `**/rebuild all** — ${reset} owner(s) reset to \`statusBackend = toCreate\`. Regenerating the whole backend (files are overwritten in place). Acompanhe os steps abaixo.`;
-  } else if (cmd === 'run') {
-    human = `**/run** — generating the backend for pending owners (\`statusBackend = toCreate | inProgress\`). Acompanhe os steps abaixo.`;
-  } else {
-    human = HELP;
   }
 
-  const addMessageAI: mls.msg.AgentIntentAddMessageAI = {
-    type: 'add-message-ai',
-    request: {
-      action: 'addMessageAI',
-      agentName: agent.agentName,
-      inputAI: [
-        { type: 'system', content: ECHO_SYSTEM },
-        // The human turn IS the final, valid collab-llm envelope; the model just returns it verbatim.
-        { type: 'human', content: JSON.stringify({ type: 'result', result: human }) },
-      ],
-      taskTitle: 'agentChangeBackend',
-      threadId: context.message.threadId,
-      userMessage: context.message.content,
-      longTermMemory: { taskName: 'agentChangeBackend', flowName: 'agentChangeBackend', version: '1' },
-    },
-  };
-  return [addMessageAI];
+  const scanStep = createAgentStepPayload('cb-scan', 'agentCbScanCreateOwners', 'Scan l4 (statusBackend = toCreate)', { planId: 'cb-scan' }, [], 'sequential', 'waiting_human_input');
+  return [addMessageAI, createBootstrapAddStepIntent(context, scanStep)];
 }
 
 async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   if (!context.task) throw new Error(`[${agent.agentName}] task invalid`);
-  const cmd = parseCommand(context.message.content);
-  if (cmd === 'help') {
-    // CLI help shown by the echo above — finish without starting the flow.
-    return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'help')];
-  }
-  const scanStep = createAgentStepPayload('cb-scan', 'agentCbScanCreateOwners', 'Scan l4 (statusBackend = toCreate)', { planId: 'cb-scan' }, [], 'sequential', 'waiting_human_input');
-  return [createAddStepIntent(context, step, scanStep)];
+  return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'Root bootstrap completed (no model).')];
 }
 
-const ECHO_SYSTEM = `
-<!-- modelType: codeawsfast -->
+/** Add a step under the root (stepId 1), created by the skipRootLLM bootstrap above. */
+function createBootstrapAddStepIntent(context: mls.msg.ExecutionContext, step: mls.msg.AIPayload): mls.msg.AgentIntentAddStep {
+  return {
+    type: 'add-step',
+    messageId: '',
+    threadId: context.message.threadId,
+    taskId: '',
+    parentStepId: 1,
+    step,
+  };
+}
 
-The user turn contains a single JSON object (a valid collab-llm result envelope, e.g.
-{"type":"result","result":"..."}). Return that JSON object EXACTLY and ONLY it — raw JSON, no code
-fences, no extra text, no tool calls.
-`;
+function createHelpStep(): mls.msg.AIPayload {
+  return {
+    type: 'result',
+    stepId: 0,
+    status: 'completed',
+    interaction: null,
+    nextSteps: [],
+    stepTitle: 'Help',
+    result: HELP,
+    planning: { planId: 'help', dependsOn: [], executionMode: 'sequential', executionHost: 'client' },
+  } as any;
+}
 
-const HELP = `**agentChangeBackend — CLI**
+const HELP = `agentChangeBackend — CLI
 
-Usage: \`@@changeBackend <command>\`
+Uso: @@changeBackend <comando>
 
-Commands:
-- \`/rebuild all\` — reset \`statusBackend\` of ALL owners (done / inProgress / …) back to \`toCreate\`, then regenerate the whole backend. Files are **overwritten in place** (no manual delete needed).
-- \`/run\` — generate for pending owners (\`statusBackend = toCreate | inProgress\`) **without** resetting.
-- \`/help\` — show this help.
+Comandos:
+- /rebuild all : reseta statusBackend de TODOS os owners para toCreate e regenera o backend (arquivos sobrescritos in place; sem deletar).
+- /run         : gera os owners pendentes (statusBackend = toCreate | inProgress) sem resetar.
+- /help        : mostra esta ajuda.
 
-Anything else shows this help.`;
+Qualquer outro comando mostra esta ajuda.`;
