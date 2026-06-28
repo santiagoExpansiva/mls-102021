@@ -207,8 +207,13 @@ function ownerFrom(
   const id = readString(obj.operationId) || readString(obj.workflowId);
   if (!id) return null;
   const entity = readString(obj.entity);
-  const reads = readStringArray(obj.reads);
-  const writes = readStringArray(obj.writes);
+  // Workflows declare the entities they touch in `entities` (no reads/writes). Fold those in so the
+  // deterministic port derivation works for workflows too (otherwise the model invents port names).
+  // Strip field-level refs ("CashMovement.amount") — keep only bare entity ids.
+  const bare = (arr: string[]) => arr.filter(s => s && !s.includes('.'));
+  const entitiesArr = bare(readStringArray(obj.entities));
+  const reads = [...new Set([...bare(readStringArray(obj.reads)), ...entitiesArr])];
+  const writes = [...new Set([...bare(readStringArray(obj.writes)), ...entitiesArr])];
   const moduleName = entityToModule.get(entity) || entityToModule.get(reads[0]) || entityToModule.get(writes[0]) || fallbackModule;
   return {
     kind,

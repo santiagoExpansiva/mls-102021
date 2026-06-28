@@ -2,14 +2,17 @@
 
 // Generate the usecases (layer_2_application/usecases), ONE per pending operation/workflow. To keep
 // each LLM response small (the per-usecase defs carry explicit functions[] input/output), this agent
-// fans out: a DISPATCHER step (deterministic, no LLM) creates one WORKER step per owner — the runtime
-// runs them in parallel (configured 5 slots) — plus the controller step that JOINS on all workers
-// (dependsOn). Each WORKER does one LLM call and saves one usecase .defs.ts. Same agent, two modes,
-// selected by whether the step args carry an ownerId.
+// fans out via the runtime's parallel_dynamic/progress: a DISPATCHER step (deterministic, no LLM)
+// emits ONE parallel step whose args queue = the owner ids (createParallelStepIntent, maxParallel 5).
+// The runtime runs the workers in a pool of 5 slots and DISCARDS each child's payload as it finishes
+// (the task stays small), instead of keeping N persistent steps. Each WORKER (same agent, reached with
+// its ownerId in hook.args) does one LLM call and saves one usecase .defs.ts. The controller step JOINS
+// on the single parallel parent (dependsOn its planId).
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
-  readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, createAgentStepPayload, createAddStepIntent,
+  readBackendScan, createPromptReadyIntent, createUpdateStatusIntent, createAgentStepPayload,
+  createAddStepIntent, createParallelStepIntent,
   extractPlannerOutput, plannerConfig, createPlannerToolSchema, saveAgentTrace,
   saveDefs, buildArtifact, buildPipelineItem, usecaseFileInfo, repositoryPortFileInfo, domainEntityFileInfo,
   dtsRef, layerSkills, readString, readStringArray, lowerFirst, logPrefix,
@@ -19,18 +22,20 @@ import { usecaseResultSchema } from '/_102021_/l2/agentChangeBackend/cbSchemas.j
 
 const AGENT_NAME = 'agentCbUsecase';
 const TOOL_NAME = 'submitUsecase';
+const FANOUT_PLAN_ID = 'cb-usecase-fanout';
 const toolSchema = createPlannerToolSchema(TOOL_NAME, 'Submit the usecase.', usecaseResultSchema);
 
 export function createAgent(): IAgentAsync {
-  return { agentName: AGENT_NAME, agentProject: 102021, agentFolder: 'agentChangeBackend', agentDescription: 'Generate application usecases (one parallel worker per owner; controller joins)', visibility: 'private', beforePromptStep, afterPromptStep };
+  return { agentName: AGENT_NAME, agentProject: 102021, agentFolder: 'agentChangeBackend', agentDescription: 'Generate application usecases (parallel_dynamic worker per owner; controller joins)', visibility: 'private', beforePromptStep, afterPromptStep };
 }
 
-function parseArgs(prompt: string | undefined): { planId?: string; ownerId?: string } {
-  try { return JSON.parse(prompt || '{}'); } catch { return {}; }
-}
-
-function safeId(id: string): string {
-  return id.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
+// The owner id of a WORKER invocation arrives in hook.args (a bare id); the DISPATCHER step carries a
+// JSON prompt ({planId:...}) and no bare id. Resolve from args first, then step.prompt as a fallback.
+function workerOwnerId(args: string | undefined, step: mls.msg.AIAgentStep): string {
+  const a = (args ?? '').trim();
+  if (a && !a.startsWith('{')) return a;
+  const p = String((step as { prompt?: string })?.prompt ?? '').trim();
+  return p && !p.startsWith('{') ? p : '';
 }
 
 // Shared maps derived from the scan (aggregate roots, mdm ids, embedded child -> parent root).
@@ -66,30 +71,30 @@ function buildOwnerItem(o: CbOwner, maps: ReturnType<typeof deriveMaps>) {
 
 // ── beforePromptStep: dispatch (fan-out) or worker (one usecase) ───────────────
 
-async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
-  const args = parseArgs(step.prompt);
-  return args.ownerId
-    ? worker(agent, context, parentStep, step, hookSequential, args.ownerId)
+async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number, args?: string): Promise<mls.msg.AgentIntent[]> {
+  const ownerId = workerOwnerId(args, step);
+  return ownerId
+    ? worker(agent, context, parentStep, step, hookSequential, ownerId)
     : dispatch(agent, context, parentStep, step, hookSequential);
 }
 
-// DISPATCHER (deterministic, no LLM): one worker step per owner (parallel) + the controller JOIN.
+// DISPATCHER (deterministic, no LLM): ONE parallel_dynamic step whose args queue is the owner ids
+// (runtime pool of 5, payloads discarded as each finishes) + the controller JOIN on that parent.
 async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   try {
     const scan = await readBackendScan(['toCreate', 'inProgress']);
-    const intents: mls.msg.AgentIntent[] = [];
-    const workerPlanIds: string[] = [];
-    for (const o of scan.owners) {
-      const planId = `cb-uc-${safeId(o.id)}`;
-      workerPlanIds.push(planId);
-      const wstep = createAgentStepPayload(planId, AGENT_NAME, `Gerar usecase: ${o.id}`, { planId, ownerId: o.id }, [], 'parallel_static', 'waiting_human_input');
-      intents.push(createAddStepIntent(context, parentStep, wstep));
+    const ownerIds = scan.owners.map(o => o.id).filter(Boolean);
+    if (!ownerIds.length) {
+      return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'no owners to generate')];
     }
-    // Controller joins on ALL usecase workers (runs only after every usecase .defs.ts exists).
-    const cstep = createAgentStepPayload('cb-gen-http', 'agentCbHttpController', 'Gerar controllers HTTP (BFF)', { planId: 'cb-gen-http' }, workerPlanIds, 'parallel_static', 'waiting_dependency');
+    const intents: mls.msg.AgentIntent[] = [
+      createParallelStepIntent(context, parentStep, FANOUT_PLAN_ID, AGENT_NAME, 'Gerar usecases (paralelo)', ownerIds, [], 5),
+    ];
+    // Controller joins on the single parallel parent (runs after every worker finished).
+    const cstep = createAgentStepPayload('cb-gen-http', 'agentCbHttpController', 'Gerar controllers HTTP (BFF)', { planId: 'cb-gen-http' }, [FANOUT_PLAN_ID], 'sequential', 'waiting_dependency');
     intents.push(createAddStepIntent(context, parentStep, cstep));
-    console.log(`${logPrefix(agent)} fan-out ${workerPlanIds.length} usecase worker(s)`);
-    intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `fan-out ${workerPlanIds.length} usecase(s)`));
+    console.log(`${logPrefix(agent)} parallel fan-out: ${ownerIds.length} usecase(s)`);
+    intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `fan-out ${ownerIds.length} usecase(s) (parallel_dynamic)`));
     return intents;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
@@ -110,7 +115,7 @@ async function worker(agent: IAgentMeta, context: mls.msg.ExecutionContext, pare
 
 // ── afterPromptStep (worker only): save the one usecase .defs.ts ───────────────
 
-async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
+async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number, args?: string): Promise<mls.msg.AgentIntent[]> {
   let status: mls.msg.AIStepStatus = 'completed';
   let trace: string | undefined;
   try {
@@ -121,7 +126,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     const scan = await readBackendScan(['toCreate', 'inProgress']);
     const module = scan.moduleNames[0] || 'unknown';
     const { roots, mdmIds, childToRoot } = deriveMaps(scan);
-    const usecaseId = readString(result?.usecaseId) || parseArgs(step.prompt).ownerId || '';
+    const usecaseId = readString(result?.usecaseId) || workerOwnerId(args, step);
     if (!usecaseId) throw new Error('missing usecaseId');
 
     // Final ports = model's ports ∪ deterministic ports (owner entity+writes, children -> parent root),
@@ -129,9 +134,15 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     const owner = scan.owners.find(o => o.id === usecaseId);
     const ownerRefs = owner ? [owner.entity, ...owner.reads, ...owner.writes].filter(Boolean) : [];
     const detPorts = [...new Set(ownerRefs.map(id => childToRoot.get(id) ?? id))].filter(id => roots.has(id) && !mdmIds.has(id));
-    const ports = [...new Set([...readStringArray(result?.ports), ...detPorts])].filter(id => !mdmIds.has(id));
+    // Trust only REAL aggregate roots: the model sometimes invents port names ("dailyShiftPort",
+    // "recipePort", "productionTicket"). Keep model ports only if they are real roots, union with the
+    // deterministic ones (derived from the owner's entities, children resolved to their parent).
+    const ports = [...new Set([...readStringArray(result?.ports), ...detPorts])].filter(id => roots.has(id) && !mdmIds.has(id));
     result.ports = ports;
     result.mdmRefs = [...new Set(ownerRefs.filter(id => mdmIds.has(id)))];
+    for (const fn of Array.isArray(result?.functions) ? result.functions : []) {
+      fn.ports = readStringArray(fn?.ports).filter((id: string) => ports.includes(id)); // drop invented ports
+    }
 
     const fi = usecaseFileInfo(module, usecaseId);
     const dependsFiles = [
