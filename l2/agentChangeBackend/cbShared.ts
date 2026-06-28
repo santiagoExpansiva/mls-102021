@@ -154,7 +154,16 @@ export async function readBackendScan(statuses: string[] = ['toCreate']): Promis
     .map(({ kind, obj }) => ownerFrom(kind, obj, entityToModule, moduleFallback))
     .filter((o): o is CbOwner => !!o && wanted.has(o.statusBackend));
 
-  const aggregates = deriveAggregates(entities, relationships);
+  // Roots that operations own (entity + writes) across ALL operations regardless of status — the
+  // aggregate boundaries must be stable even when only some owners are pending (toCreate).
+  const operatedRootIds = new Set<string>();
+  for (const { obj } of rawOwners) {
+    const e = readString(obj.entity);
+    if (e) operatedRootIds.add(e);
+    for (const w of readStringArray(obj.writes)) operatedRootIds.add(w);
+  }
+
+  const aggregates = deriveAggregates(entities, relationships, operatedRootIds);
   return { project, moduleNames: Array.from(moduleNames).sort(), owners, entities, relationships, aggregates };
 }
 
@@ -217,18 +226,20 @@ function ownerFrom(
 
 // ── aggregate derivation (baseline; the LLM index agent may refine) ────────────
 
-export function deriveAggregates(entities: CbEntity[], relationships: CbRelationship[]): CbAggregate[] {
+export function deriveAggregates(
+  entities: CbEntity[],
+  relationships: CbRelationship[],
+  operatedRootIds: Set<string> = new Set(),
+): CbAggregate[] {
   const byId = new Map(entities.map(e => [e.entityId, e]));
-  const cores = entities.filter(e => e.kind === 'core');
-  const aggregates: CbAggregate[] = [];
 
-  for (const core of cores) {
+  const buildAggregate = (root: CbEntity): CbAggregate => {
     const embeddedMembers: string[] = [];
     const events: string[] = [];
     const mdmRefs: string[] = [];
     for (const rel of relationships) {
-      // a supporting child related to this core (root -> child) folds into the root details JSONB
-      const childId = rel.fromEntity === core.entityId ? rel.toEntity : rel.toEntity === core.entityId ? rel.fromEntity : '';
+      // a supporting child related to this root (root -> child) folds into the root details JSONB
+      const childId = rel.fromEntity === root.entityId ? rel.toEntity : rel.toEntity === root.entityId ? rel.fromEntity : '';
       if (!childId) continue;
       const child = byId.get(childId);
       if (!child) continue;
@@ -236,7 +247,23 @@ export function deriveAggregates(entities: CbEntity[], relationships: CbRelation
       else if (child.kind === 'event') push(events, childId);
       else if (child.kind === 'mdm') push(mdmRefs, childId);
     }
-    aggregates.push({ aggregateId: core.entityId, rootEntity: core.entityId, embeddedMembers, events, mdmRefs });
+    return { aggregateId: root.entityId, rootEntity: root.entityId, embeddedMembers, events, mdmRefs };
+  };
+
+  const aggregates: CbAggregate[] = entities.filter(e => e.kind === 'core').map(buildAggregate);
+
+  // Invariant: any entity an operation acts on as a root (operatedRootIds = operation.entity + writes)
+  // must own an entity+port+table — UNLESS it is embedded in another aggregate (a child folded into
+  // details JSONB) or is an mdm/event entity. This keeps generation robust when the ontology
+  // under-classifies kinds (e.g. a standalone "table"/"category" marked supporting): without it the
+  // usecases that reference its port would import a module that was never generated.
+  const embedded = new Set(aggregates.flatMap(a => a.embeddedMembers));
+  const roots = new Set(aggregates.map(a => a.rootEntity));
+  for (const id of operatedRootIds) {
+    const e = byId.get(id);
+    if (!e || roots.has(id) || embedded.has(id) || e.kind === 'mdm' || e.kind === 'event') continue;
+    aggregates.push(buildAggregate(e));
+    roots.add(id);
   }
   return aggregates;
 }

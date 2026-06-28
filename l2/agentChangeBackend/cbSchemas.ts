@@ -130,19 +130,36 @@ export const repositoryAdapterResultSchema = {
   },
 } as const;
 
-export const usecaseResultSchema = {
+// A usecase file may export SEVERAL functions, each with its OWN explicit Input/Output FIELDS (not
+// just type names) so the .ts and the BFF that imports it are deterministic.
+const ioFieldSchema = { type: 'object', additionalProperties: false, required: ['name', 'type'], properties: { name: str, type: str, required: bool, description: str, ofEntity: str } } as const;
+
+const usecaseFunctionSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['usecaseId', 'functionName', 'inputTypeName', 'outputTypeName', 'ports'],
+  required: ['functionName', 'inputTypeName', 'outputTypeName', 'input', 'output'],
   properties: {
-    usecaseId: str,
     functionName: str,
     inputTypeName: str,
     outputTypeName: str,
-    ports: strArray,         // repository ports imported (interfaces)
+    input: { type: 'array', items: ioFieldSchema },   // explicit input fields (camelCase)
+    output: { type: 'array', items: ioFieldSchema },  // explicit output fields (camelCase)
+    ports: strArray,          // ports this function uses
     rulesApplied: strArray,
     transactional: bool,
     steps: strArray,
+  },
+} as const;
+
+export const usecaseResultSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['usecaseId', 'ports', 'functions'],
+  properties: {
+    usecaseId: str,
+    ports: strArray,          // all repository ports the usecase file imports (union of functions)
+    rulesApplied: strArray,
+    functions: { type: 'array', items: usecaseFunctionSchema },  // 1..N exported functions
   },
 } as const;
 
