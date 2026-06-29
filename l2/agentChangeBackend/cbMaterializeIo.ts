@@ -141,6 +141,9 @@ export async function saveGeneratedTs(
       const model = await file.getOrCreateModel();
       if (model) model.model.setValue(content);
     }
+    // Bump updatedAt so the freshly materialized .ts is newer than its .defs.ts (keeps isStale correct
+    // across runs); libStor.createStorFile / setContent do not set it.
+    file.updatedAt = new Date().toISOString();
     await mls.stor.localStor.setContent(file, { contentType: 'string', content });
     if (!shortName.endsWith('.defs')) await compileGeneratedTs(project, level, folder, shortName);
     return true;

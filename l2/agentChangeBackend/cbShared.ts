@@ -398,6 +398,9 @@ export async function saveDefs(fileInfo: CbFileInfo, exportName: string, data: u
   const info = mls.stor.convertFileReferenceToFile(ref);
   const param: IReqCreateStorFile = { ...info, source: src } as IReqCreateStorFile;
   const file = await createStorFile(param, true, true, true);
+  // Bump updatedAt so staleness (isStale: defs newer than .ts) re-materializes after a regen — the
+  // shared libStor.createStorFile does not set it (unlike core agentDefs.createStorFile).
+  file.updatedAt = new Date().toISOString();
   await mls.stor.localStor.setContent(file, { contentType: 'string', content: src });
   return ref;
 }
