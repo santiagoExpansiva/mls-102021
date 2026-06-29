@@ -110,7 +110,10 @@ async function worker(agent: IAgentMeta, context: mls.msg.ExecutionContext, pare
   if (!owner) return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'failed', `owner not found: ${ownerId}`)];
   const item = buildOwnerItem(owner, deriveMaps(scan));
   const human = `## Owner -> usecase (entity fields included so you can declare explicit input/output)\n${JSON.stringify(item, null, 2)}\n\nReturn ONE usecase with functions[] — each function has explicit input[] and output[] FIELDS (camelCase, derived from entityFields + opKind). A usecase MAY expose several functions with different IO.`;
-  return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ''), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
+  // prompt_ready args MUST equal the parallel child's queued hook args (the ownerId) so the runtime
+  // (continueBeforePrompt → findBeforePromptStep by parentStepId+args) matches it. step.prompt is not
+  // yet set to the arg on the first beforePromptStep of a parallel child.
+  return [createPromptReadyIntent(context, parentStep, hookSequential, ownerId, systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
 // ── afterPromptStep (worker only): save the one usecase .defs.ts ───────────────
