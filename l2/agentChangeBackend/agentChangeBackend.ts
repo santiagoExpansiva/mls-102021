@@ -3,10 +3,12 @@
 // Stage 3 backend reconciler — ROOT, with a small CLI. v1 is autonomous and create-only.
 // The root LLM is SKIPPED (AgentIntentAddMessageAI.skipRootLLM) — bootstrap is deterministic.
 // Usage (type after the agent mention):
-//   /rebuild all   reset statusBackend of ALL owners -> toCreate, then regenerate (files overwritten
-//                  in place by saveDefs — no manual delete needed)
+//   /rebuild all   reset statusBackend of ALL owners -> toCreate, then regenerate defs AND materialize
+//                  the .ts (files overwritten in place by saveDefs — no manual delete needed)
+//   /rebuild defs  reset ALL owners -> toCreate and regenerate the .defs.ts ONLY (NO .ts materialization)
 //   /run           generate for pending owners (statusBackend = toCreate | inProgress), no reset
-//   /help | other  print help (a result step) and stop
+//   (empty mention) same as /run: scan l4 for toCreate owners and materialize the stale/missing .ts
+//   /help          print help (a result step) and stop
 // See spec.md + flow.json in this folder.
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
@@ -16,7 +18,7 @@ import {
 
 const ALL_STATUSES = ['toCreate', 'toUpdate', 'toRemove', 'inProgress', 'done'];
 
-type CbCommandKind = 'rebuild' | 'run' | 'help';
+type CbCommandKind = 'rebuild-all' | 'rebuild-defs' | 'run' | 'help';
 
 export function createAgent(): IAgentAsync {
   return {
@@ -30,10 +32,12 @@ export function createAgent(): IAgentAsync {
   };
 }
 
-/** Parse the user prompt into a CLI command. Lenient: mention stripped, keyword matched anywhere. */
+/** Parse the user prompt into a CLI command. Lenient: mention stripped, keyword matched anywhere.
+ * Empty (bare @@changeBackend) is the autonomous default -> 'run' (scan toCreate + materialize stale). */
 function parseCommand(raw: string | undefined): CbCommandKind {
   const t = normalizePrompt(raw);
-  if (/\brebuild\b/.test(t)) return 'rebuild';
+  if (!t) return 'run';
+  if (/\brebuild\b/.test(t)) return /\bdefs\b/.test(t) ? 'rebuild-defs' : 'rebuild-all';
   if (/\brun\b/.test(t)) return 'run';
   return 'help';
 }
@@ -73,16 +77,16 @@ async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.Executio
     return [addMessageAI, createBootstrapAddStepIntent(context, createHelpStep())];
   }
 
-  if (cmd === 'rebuild') {
+  if (cmd === 'rebuild-all' || cmd === 'rebuild-defs') {
     let reset = 0;
     try {
       const scan = await readBackendScan(ALL_STATUSES);
       for (const owner of scan.owners) {
         if (await setOwnerStatusBackend(owner, 'toCreate')) reset++;
       }
-      console.log(`${logPrefix(agent)} /rebuild — reset ${reset} owner(s) -> toCreate`);
+      console.log(`${logPrefix(agent)} ${cmd} — reset ${reset} owner(s) -> toCreate`);
     } catch (e) {
-      console.error(`${logPrefix(agent)} /rebuild reset failed: ${e instanceof Error ? e.message : String(e)}`);
+      console.error(`${logPrefix(agent)} ${cmd} reset failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -125,8 +129,10 @@ const HELP = `agentChangeBackend — CLI
 Uso: @@changeBackend <comando>
 
 Comandos:
-- /rebuild all : reseta statusBackend de TODOS os owners para toCreate e regenera o backend (arquivos sobrescritos in place; sem deletar).
-- /run         : gera os owners pendentes (statusBackend = toCreate | inProgress) sem resetar.
-- /help        : mostra esta ajuda.
+- /rebuild all  : reseta statusBackend de TODOS os owners para toCreate e regenera o backend — defs E materialização dos .ts (arquivos sobrescritos in place; sem deletar).
+- /rebuild defs : reseta TODOS os owners para toCreate e regenera SOMENTE os .defs.ts (NÃO materializa os .ts).
+- /run          : gera os owners pendentes (statusBackend = toCreate | inProgress) sem resetar; materializa os .ts faltando/desatualizados.
+- (sem comando) : igual ao /run — varre o l4 por owners toCreate e materializa os .ts antigos/ausentes.
+- /help         : mostra esta ajuda.
 
-Qualquer outro comando mostra esta ajuda.`;
+Qualquer outro comando (texto não reconhecido) mostra esta ajuda.`;

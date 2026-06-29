@@ -11,7 +11,7 @@ import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
   readBackendScan, enqueueNext, createUpdateStatusIntent, parseDefsSource, isRecord,
   saveDefs, buildArtifact, buildPipelineItem, httpControllerFileInfo, usecaseFileInfo,
-  dtsRef, layerSkills, capitalize, lowerFirst, logPrefix,
+  dtsRef, layerSkills, capitalize, lowerFirst, logPrefix, readCliCommand,
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 
 const AGENT_NAME = 'agentCbHttpController';
@@ -64,9 +64,14 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       saved++;
     }
     console.log(`${logPrefix(agent)} saved ${saved} controller defs (l4-driven; ${contracts.size} contract(s) for refinement)`);
+    // /rebuild defs stops at the .defs.ts (no .ts materialization): skip cb-materialize, go to cb-register.
+    const defsOnly = readCliCommand(context) === 'rebuild-defs';
+    const next = defsOnly
+      ? enqueueNext(context, parentStep, step, 'cb-register', 'agentCbRegister', 'Registrar backend', {})
+      : enqueueNext(context, parentStep, step, 'cb-materialize', 'agentCbMaterialize', 'Materializar .defs.ts -> .ts', {});
     return [
-      enqueueNext(context, parentStep, step, 'cb-materialize', 'agentCbMaterialize', 'Materializar .defs.ts -> .ts', {}),
-      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Generated ${saved} controller(s) from l4.`),
+      next,
+      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Generated ${saved} controller(s) from l4${defsOnly ? ' (defs-only: .ts skipped)' : ''}.`),
     ];
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

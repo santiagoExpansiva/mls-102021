@@ -551,6 +551,12 @@ export function planIdOf(step: mls.msg.AIPayload | undefined): string {
   return (step as any)?.planning?.planId || '';
 }
 
+/** The CLI command the root stored in the task longMemory (rebuild-all | rebuild-defs | run | help). */
+export function readCliCommand(context: mls.msg.ExecutionContext): string {
+  const lm = (context.task?.iaCompressed as { longMemory?: Record<string, unknown> } | undefined)?.longMemory;
+  return typeof lm?.cliCommand === 'string' ? lm.cliCommand : '';
+}
+
 /** Enqueue the next sequential step under the same parent, depending on the current step. v1 uses a
  * simple linear chain (not the parallel_dynamic fan-out in flow.json) — easier to reason about and
  * compile; parallelization is a later optimization. */
