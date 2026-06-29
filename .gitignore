@@ -25,6 +25,6 @@ Temporary Items
 /dist/
 /obj/
 /l2/agents/NewSolution
-# agentMaterializeL1 runtime config (holds the collab-llm token — never commit)
-/l1/agentMaterializeL1/materializeL1.config.json
+# cbMaterializeCli runtime config (holds the collab-llm token — never commit)
+/l1/cbMaterializeCli/materializeL1.config.json
 /.materializeL1/

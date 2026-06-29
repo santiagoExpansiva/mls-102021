@@ -358,20 +358,20 @@ export interface CbPipelineItem {
   skills: string[];
   rulesPath?: string;
   rulesApplied?: string[];
-  afterSaveBackEnd?: string;
   agent: string;
 }
 
-/** Build the pipeline item that makes a .defs.ts self-sufficient for agentMaterializeGen: it carries
- * the outputPath (.ts), the dependsFiles (.d.ts of the inner callee layer) and skills (the LLM
- * context = layer skill + platform defs). See spec.md (auto-suficiência). */
+/** Build the pipeline item that makes a .defs.ts self-sufficient for materialization (agentCbMaterialize
+ * in-flow, or the cbMaterializeCli Node runner): it carries the outputPath (.ts), the dependsFiles
+ * (.d.ts of the inner callee layer) and skills (the LLM context = layer skill + platform defs).
+ * See spec.md (auto-suficiência). */
 export function buildPipelineItem(
   shortName: string,
   type: string,
   fileInfo: CbFileInfo,
   dependsFiles: string[],
   skills: string[],
-  opts: { rulesPath?: string; rulesApplied?: string[]; afterSaveBackEnd?: string } = {},
+  opts: { rulesPath?: string; rulesApplied?: string[] } = {},
 ): CbPipelineItem {
   const defPath = defsRef(fileInfo);
   return {
@@ -384,8 +384,7 @@ export function buildPipelineItem(
     skills,
     ...(opts.rulesPath ? { rulesPath: opts.rulesPath } : {}),
     ...(opts.rulesApplied && opts.rulesApplied.length ? { rulesApplied: opts.rulesApplied } : {}),
-    ...(opts.afterSaveBackEnd ? { afterSaveBackEnd: opts.afterSaveBackEnd } : {}),
-    agent: 'agentMaterializeGen',
+    agent: 'agentCbMaterialize',
   };
 }
 

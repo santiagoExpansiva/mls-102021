@@ -5,7 +5,7 @@
 // the response defaults to the usecase output. The frontend contract is OPTIONAL refinement: when a
 // per-page contract exists, it is added to dependsFiles so the materializer shapes the Output to it —
 // never a dependency. This step is DETERMINISTIC (binding owner->usecase by id), so handlers are never
-// empty; the .ts itself is written later by agentMaterializeGen from the usecase .d.ts + skill.
+// empty; the .ts itself is written by the next step (agentCbMaterialize) from the usecase .d.ts + skill.
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
@@ -15,7 +15,6 @@ import {
 } from '/_102021_/l2/agentChangeBackend/cbShared.js';
 
 const AGENT_NAME = 'agentCbHttpController';
-const REGISTER = '_102021_/l2/agentMaterializeSolution/registerBackEnd.ts?registerController';
 
 export function createAgent(): IAgentAsync {
   return { agentName: AGENT_NAME, agentProject: 102021, agentFolder: 'agentChangeBackend', agentDescription: 'Generate BFF http controllers from l4 (usecase-driven; contract optional)', visibility: 'private', beforePromptStep };
@@ -60,13 +59,13 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       const fi = httpControllerFileInfo(module, ownerId);
       const dependsFiles = [dtsRef(usecaseFileInfo(module, ownerId))];
       if (contracts.has(ownerId)) dependsFiles.push(`_${mls.actualProject || 0}_/l2/${module}/web/contracts/${ownerId}.ts`);
-      const pipeline = [buildPipelineItem(lowerFirst(ownerId), 'httpController', fi, dependsFiles, layerSkills('httpController.md'), { afterSaveBackEnd: REGISTER })];
+      const pipeline = [buildPipelineItem(lowerFirst(ownerId), 'httpController', fi, dependsFiles, layerSkills('httpController.md'))];
       await saveDefs(fi, `${lowerFirst(ownerId)}Controller`, buildArtifact('httpController', ownerId, module, AGENT_NAME, data), pipeline);
       saved++;
     }
     console.log(`${logPrefix(agent)} saved ${saved} controller defs (l4-driven; ${contracts.size} contract(s) for refinement)`);
     return [
-      enqueueNext(context, parentStep, step, 'cb-register', 'agentCbRegister', 'Registrar backend', {}),
+      enqueueNext(context, parentStep, step, 'cb-materialize', 'agentCbMaterialize', 'Materializar .defs.ts -> .ts', {}),
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Generated ${saved} controller(s) from l4.`),
     ];
   } catch (error) {

@@ -1,4 +1,4 @@
-/// <mls fileReference="_102021_/l1/agentMaterializeL1/llmClient.ts" enhancement="_blank"/>
+/// <mls fileReference="_102021_/l1/cbMaterializeCli/llmClient.ts" enhancement="_blank"/>
 
 // Node HTTP client that calls collab-llm DIRECTLY (avoids CORS; reuses the same Bearer token
 // collab-messages uses). Mirrors collab-messages callProxyLLM: POST {baseUrl}/v1/chat/completions
@@ -7,7 +7,7 @@
 
 import { request as httpRequest } from 'node:http';
 import { request as httpsRequest } from 'node:https';
-import { GEN_TOOL, GEN_TOOL_NAME, type GenResult } from './core.js';
+import { GEN_TOOL, GEN_TOOL_NAME, type GenResult } from '../../l2/agentChangeBackend/cbMaterializeCore.js';
 
 export interface LlmConfig {
   baseUrl: string;          // e.g. http://localhost:3050 (collab-llm.baseUrl in appconfig.json)

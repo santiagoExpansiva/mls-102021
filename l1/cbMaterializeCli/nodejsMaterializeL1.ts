@@ -1,4 +1,4 @@
-/// <mls fileReference="_102021_/l1/agentMaterializeL1/nodejsMaterializeL1.ts" enhancement="_blank"/>
+/// <mls fileReference="_102021_/l1/cbMaterializeCli/nodejsMaterializeL1.ts" enhancement="_blank"/>
 
 // Node runner for the L1 materialization (.defs.ts -> .ts). Reuses the pure core (plan, layer order,
 // staleness, prompt) and the direct collab-llm client. It is mls-free by construction (l1 tsconfig has
@@ -17,9 +17,9 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   parseDefs, orderItems, isStale, layerRank,
-  buildSystemPrompt, buildHumanPrompt, applyHeader, DEFAULT_MODEL_TYPE,
+  buildSystemPrompt, buildHumanPrompt, applyHeader, DEFAULT_MODEL_TYPE, expandContextRef,
   type PipelineItem, type PlannedItem,
-} from './core.js';
+} from '../../l2/agentChangeBackend/cbMaterializeCore.js';
 import { callCollabLlm, parseGenResult, type LlmConfig } from './llmClient.js';
 
 // Resolve this script's folder from argv[1] (CommonJS + ESM/tsx safe; avoids import.meta, which the
@@ -36,19 +36,8 @@ function mlsToFs(ref: string): string {
   return path.join(ROOT, ref.replace(/^_(\d+)_\//, 'mls-$1/'));
 }
 
-// `_102034_.d.ts` (the shared runtime contracts) has no aggregated d.ts on disk. Expand it to the real
-// 102034 source files so every prompt carries RequestContext, IDataRuntime/getTable, TableDefinition,
-// AppError/ok and the repository registry — the types the adapters/usecases/controllers compile against.
-const CONTRACTS_102034 = [
-  '_102034_/l1/server/layer_2_controllers/contracts.ts',
-  '_102034_/l1/server/layer_1_external/data/runtime.ts',
-  '_102034_/l1/server/layer_1_external/persistence/contracts.ts',
-  '_102034_/l1/server/layer_2_application/repositoryRegistry.ts',
-];
-
-function expandRef(ref: string): string[] {
-  return ref === '_102034_.d.ts' ? CONTRACTS_102034 : [ref];
-}
+// Ref expansion (e.g. `_102034_.d.ts` -> the real 102034 contract sources) is shared with the in-studio
+// agent via core.expandContextRef so the prompt context never drifts between the CLI and the agent.
 
 function readIfExists(abs: string): string | null {
   try { return fs.readFileSync(abs, 'utf8'); } catch { return null; }
@@ -113,7 +102,7 @@ function assemble(item: PipelineItem, data: unknown, modelType: string): { syste
   const skillSections: string[] = [];
   const skillReport: string[] = [];
   for (const s of item.skills ?? []) {
-    for (const real of expandRef(s)) {
+    for (const real of expandContextRef(s)) {
       const r = readContext(real);
       skillReport.push(`${r.found ? 'OK ' : 'MISS'} ${real}`);
       if (r.found) skillSections.push(`<!-- skill: ${real} -->\n${r.content}`);

@@ -1,4 +1,4 @@
-/// <mls fileReference="_102021_/l1/agentMaterializeL1/core.ts" enhancement="_blank"/>
+/// <mls fileReference="_102021_/l2/agentChangeBackend/cbMaterializeCore.ts" enhancement="_blank"/>
 
 // Pure materialization core for L1 (.defs.ts -> .ts). NO mls.*, NO fs, NO dom: only ES2022 + the
 // MaterializeEnv port. It is shared logic between the Node runner (nodejsMaterializeL1.ts, fs + LLM
@@ -17,7 +17,6 @@ export interface PipelineItem {
   dependsOn?: string[];         // explicit cross-item ids (usually empty; layer rank drives order)
   skills?: string[];            // .md skill(s) + _102034_.d.ts (prompt context)
   rulesApplied?: string[];
-  afterSaveBackEnd?: string;
   agent?: string;
 }
 
@@ -191,4 +190,21 @@ export function applyHeader(outputPath: string, code: string): string {
   const header = `/// <mls fileReference="${outputPath}" enhancement="_blank"/>`;
   const trimmed = code.trimStart();
   return trimmed.startsWith('///') ? code : `${header}\n\n${code}`;
+}
+
+// ─── dependsFiles/skill ref expansion (shared by the Node CLI and the in-studio agent) ─────────────
+
+// `_102034_.d.ts` (the shared runtime contracts) has no aggregated d.ts; expand the alias to the real
+// 102034 source files so every prompt carries RequestContext, IDataRuntime/getTable, TableDefinition,
+// AppError/ok and the repository registry — the types adapters/usecases/controllers compile against.
+export const CONTRACTS_102034: readonly string[] = [
+  '_102034_/l1/server/layer_2_controllers/contracts.ts',
+  '_102034_/l1/server/layer_1_external/data/runtime.ts',
+  '_102034_/l1/server/layer_1_external/persistence/contracts.ts',
+  '_102034_/l1/server/layer_2_application/repositoryRegistry.ts',
+];
+
+// Map a single context ref to the real file ref(s) to read. Pure (ref -> refs); the caller does the I/O.
+export function expandContextRef(ref: string): string[] {
+  return ref === '_102034_.d.ts' ? [...CONTRACTS_102034] : [ref];
 }

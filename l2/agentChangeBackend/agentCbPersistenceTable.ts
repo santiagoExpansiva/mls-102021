@@ -15,7 +15,6 @@ import { persistenceTableResultSchema } from '/_102021_/l2/agentChangeBackend/cb
 
 const AGENT_NAME = 'agentCbPersistenceTable';
 const TOOL_NAME = 'submitPersistenceTables';
-const REGISTER = '_102021_/l2/agentMaterializeSolution/registerBackEnd.ts?registerLayer1';
 const toolSchema = createPlannerToolSchema(TOOL_NAME, 'Submit the table definitions.', batchSchema(persistenceTableResultSchema));
 
 export function createAgent(): IAgentAsync {
@@ -49,7 +48,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       if (!tableId) continue;
       const fi = persistenceTableFileInfo(module, tableId);
       const dependsFiles = [dtsRef(domainEntityFileInfo(module, tableId))];
-      const pipeline = [buildPipelineItem(lowerFirst(tableId), 'persistenceTable', fi, dependsFiles, layerSkills('persistenceTable.md'), { afterSaveBackEnd: REGISTER })];
+      const pipeline = [buildPipelineItem(lowerFirst(tableId), 'persistenceTable', fi, dependsFiles, layerSkills('persistenceTable.md'))];
       await saveDefs(fi, `${lowerFirst(tableId)}TableDefinition`, buildArtifact('table', tableId, module, AGENT_NAME, item), pipeline);
       saved++;
     }

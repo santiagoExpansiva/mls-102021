@@ -11,7 +11,7 @@ boundary input only. NO `ctx.data`, NO persistence/domain-internals import.
 
 ```ts
 /// <mls fileReference="_{project}_/l1/{module}/layer_1_external/adapters/http/controllers/createOrder.ts" enhancement="_blank"/>
-import { ok, AppError, type BffHandler } from '/_102034_/l1/server/layer_2_controllers/contracts.js';
+import { ok, AppError, type BffHandler, type ControllerRoute } from '/_102034_/l1/server/layer_2_controllers/contracts.js';
 import { createOrder, type CreateOrderInput } from '/_{project}_/l1/{module}/layer_2_application/usecases/createOrder.js';
 
 export const {module}CreateOrderHandler: BffHandler = async ({ request, ctx }) => {
@@ -25,11 +25,16 @@ export const {module}CreateOrderHandler: BffHandler = async ({ request, ctx }) =
   const result = await createOrder(ctx, input);
   return ok(result.order);
 };
+
+// Self-describing routes — the runtime discovers them by importing this controller (no router file).
+export const routes: ControllerRoute[] = [
+  { key: '{module}.createOrder.createOrder', handler: {module}CreateOrderHandler },
+];
 ```
 
 ## Rules
 
-- Import line is ALWAYS `import { ok, AppError, type BffHandler } from '/_102034_/l1/server/layer_2_controllers/contracts.js';`
+- Import line is ALWAYS `import { ok, AppError, type BffHandler, type ControllerRoute } from '/_102034_/l1/server/layer_2_controllers/contracts.js';`
   — include `AppError` even for `kind: 'query'` handlers (they still do boundary validation and throw it).
 - When mapping to a frontend contract (`outputSource === 'contract'`), import its types with the FULL
   aliased path INCLUDING the leading slash: `import type { ... } from '/_{project}_/l2/{module}/web/contracts/{page}.js';`
@@ -42,4 +47,6 @@ export const {module}CreateOrderHandler: BffHandler = async ({ request, ctx }) =
 - `kind: 'query'` → return the queried data (unwrap the named output property); `command`/`mutation` →
   return the whole result. When a contract Output is provided, map field names to match it exactly.
 - NO `ctx.data`, NO imports from `adapters/persistence` or the domain internals.
-- Route key per command is `{module}.{page}.{command}` (registered separately in the router).
+- ALWAYS export `const routes: ControllerRoute[]` with one entry per `data.routes[]`: `{ key, handler }`,
+  where `key` is the route key from the defs (`{module}.{page}.{command}`) and `handler` is the exported
+  handler const. The runtime discovers routes from this export — there is NO generated router file.
