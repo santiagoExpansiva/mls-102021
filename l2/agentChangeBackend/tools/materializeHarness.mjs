@@ -72,7 +72,7 @@ function firstExportName(src) {
 // ── system/human prompt (mirrors agentMaterializeGen.buildSystemPrompt/buildHumanPrompt) ──
 function buildSystemPrompt(skillSections, outputPath) {
   const skills = skillSections.length ? skillSections.join('\n\n---\n\n') : '<!-- no skill loaded -->';
-  return `<!-- modelType: codeinstruct2 -->
+  return `<!-- modelType: codehigh -->
 
 You generate a TypeScript file based on a definition and context files.
 

@@ -146,7 +146,7 @@ export const GEN_TOOL = {
   },
 } as const;
 
-export const DEFAULT_MODEL_TYPE = 'codeinstruct2';
+export const DEFAULT_MODEL_TYPE = 'codehigh';
 
 // Read `<!-- modelType: X -->` from a system prompt (the collab-llm `model` alias the studio sends).
 export function parseModelType(systemPrompt: string): string | null {
