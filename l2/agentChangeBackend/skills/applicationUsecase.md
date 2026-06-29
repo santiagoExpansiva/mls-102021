@@ -95,6 +95,44 @@ const table = doc.details; // the master-data payload
 just storing/passing the id is enough — only fetch the record when you actually need its fields. Do not
 import any `/_{project}_/.../ports/{mdm}Repository` — it does not exist.
 
+### Writing a module-owned MDM record (cadastral data only)
+
+When `data.kind === 'mdm'` and the operation creates/updates the record, write through `mdmDocument.put`.
+The stored `details` is an `MdmDetailRecord` with REQUIRED base fields — you cannot put a bare entity
+object. Keep the base fields valid and place ALL of the module's own columns under the module-namespace
+key (`details[<module>]`), which `BaseMdmDetailRecord` allows via `[moduleNamespace: string]: unknown`:
+
+```ts
+// status MUST be an MdmStatus: 'Active' | 'Inactive' | 'Merged' | 'Blocked' (map your domain lifecycle).
+// subtype MUST be an MdmSubtype: 'Product' (menu item/category), 'AssetGeneric' (table/furniture),
+// 'Location' (room), 'Person' | 'Company' | ... — pick the closest one.
+const now = ctx.clock.nowIso();
+// UPDATE: preserve the existing record, override only what changed.
+const doc = await ctx.data.mdmDocument.get({ mdmId: input.menuCategoryId });
+if (!doc) throw new AppError('NOT_FOUND', `MDM record not found: ${input.menuCategoryId}`, 404, { mdmId: input.menuCategoryId });
+await ctx.data.mdmDocument.put({
+  record: {
+    ...doc,
+    details: {
+      ...doc.details,
+      name: input.name ?? doc.details.name,
+      status: input.status === 'inactive' ? 'Inactive' : 'Active',
+      updatedAt: now,
+      cafeFlow: { ...(doc.details.cafeFlow as object ?? {}), ...moduleFields }, // entity columns in JSONB
+    },
+  },
+  expectedVersion: doc.version,
+});
+```
+
+For CREATE, build the full base (`mdmId`, `subtype`, `name`, `status`, `countryCode`, `tags: []`,
+`aliases: []`, `contacts: []`, `relationshipRefs: {}`, `addresses: []`, `createdAt`, `updatedAt`,
+`<module>: {…}`) and `put({ record: { mdmId, version: 1, details } })`.
+
+NEVER store operational/transactional state (occupancy, movement, balances, `'occupied'`/`'available'`)
+in an MDM record — that is NOT cadastral data and belongs to a local `core` entity with its own table.
+The MDM `status` is always one of the four cadastral `MdmStatus` values.
+
 ## `steps` are guidance, not a contract
 
 `data.steps` (and `data.functions[].steps`) are hints about intent. The CONTRACT you must satisfy is

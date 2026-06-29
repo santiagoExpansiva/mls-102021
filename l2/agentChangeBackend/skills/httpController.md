@@ -29,6 +29,11 @@ export const {module}CreateOrderHandler: BffHandler = async ({ request, ctx }) =
 
 ## Rules
 
+- Import line is ALWAYS `import { ok, AppError, type BffHandler } from '/_102034_/l1/server/layer_2_controllers/contracts.js';`
+  — include `AppError` even for `kind: 'query'` handlers (they still do boundary validation and throw it).
+- When mapping to a frontend contract (`outputSource === 'contract'`), import its types with the FULL
+  aliased path INCLUDING the leading slash: `import type { ... } from '/_{project}_/l2/{module}/web/contracts/{page}.js';`
+  — the leading `/` is required by the path alias; NEVER emit `_{project}_/l2/...` without it.
 - One exported `BffHandler` const per command, named `{module}{Pascal(command)}Handler`. NEVER add an
   explicit return type after the arrow (`BffHandler` already encodes it).
 - Read input from `request.params` (cast to the usecase Input); boundary validation only (required

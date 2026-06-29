@@ -87,8 +87,10 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
     if (!ownerIds.length) {
       return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'no owners to generate')];
     }
+    // stepTitle is used by the runtime as the progress templateTitle ({{completed}}/{{total}}/{{failed}}
+    // are substituted live as workers finish), e.g. "Gerar usecases 27/27, falhas 0".
     const intents: mls.msg.AgentIntent[] = [
-      createParallelStepIntent(context, parentStep, FANOUT_PLAN_ID, AGENT_NAME, 'Gerar usecases (paralelo)', ownerIds, [], 5),
+      createParallelStepIntent(context, parentStep, FANOUT_PLAN_ID, AGENT_NAME, 'Gerar usecases {{completed}}/{{total}}, falhas {{failed}}', ownerIds, [], 5),
     ];
     // Controller joins on the single parallel parent (runs after every worker finished).
     const cstep = createAgentStepPayload('cb-gen-http', 'agentCbHttpController', 'Gerar controllers HTTP (BFF)', { planId: 'cb-gen-http' }, [FANOUT_PLAN_ID], 'sequential', 'waiting_dependency');

@@ -49,7 +49,7 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
   await saveAgentTrace(context, AGENT_NAME, step);
   const intents: mls.msg.AgentIntent[] = [];
   if (status === 'completed') intents.push(enqueueNext(context, parentStep, step, 'cb-persistence-index', 'agentCbPersistenceIndex', 'Planejar persistência (JSONB)', {}));
-  intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, status, trace));
+  intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, status, trace, status === 'completed' ? 'input_output' : undefined));
   return intents;
 }
 
