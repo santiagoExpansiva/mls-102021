@@ -42,23 +42,26 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     for (const owner of scan.owners) {
       const ownerId = owner.id;
       if (!ownerId) continue;
+      const routePageId = owner.pageId || ownerId;
+      const commandName = owner.commandName || ownerId;
+      const routeKey = owner.bffName || `${module}.${routePageId}.${commandName}`;
       const handlerName = `${module}${capitalize(ownerId)}Handler`;
       const kind = owner.opKind || (owner.kind === 'workflow' ? 'command' : 'command');
       const data = {
-        pageId: ownerId,
+        pageId: routePageId,
         controllerName: `${capitalize(ownerId)}Controller`,
         ownerKind: owner.kind,            // operation | workflow (l4 owner)
-        outputSource: contracts.has(ownerId) ? 'contract' : 'usecase',
+        outputSource: contracts.has(routePageId) ? 'contract' : 'usecase',
         handlers: [
-          { handlerName, command: ownerId, usecaseRef: ownerId, kind },
+          { handlerName, command: commandName, usecaseRef: ownerId, kind },
         ],
         routes: [
-          { key: `${module}.${ownerId}.${ownerId}`, handlerName },
+          { key: routeKey, handlerName },
         ],
       };
       const fi = httpControllerFileInfo(module, ownerId);
       const dependsFiles = [dtsRef(usecaseFileInfo(module, ownerId))];
-      if (contracts.has(ownerId)) dependsFiles.push(`_${mls.actualProject || 0}_/l2/${module}/web/contracts/${ownerId}.ts`);
+      if (contracts.has(routePageId)) dependsFiles.push(`_${mls.actualProject || 0}_/l2/${module}/web/contracts/${routePageId}.ts`);
       const pipeline = [buildPipelineItem(lowerFirst(ownerId), 'httpController', fi, dependsFiles, layerSkills('httpController.md'))];
       await saveDefs(fi, `${lowerFirst(ownerId)}Controller`, buildArtifact('httpController', ownerId, module, AGENT_NAME, data), pipeline);
       saved++;

@@ -64,6 +64,9 @@ export type CbFileInfo = Pick<mls.stor.IFileInfo, 'project' | 'level' | 'folder'
 export interface CbOwner {
   kind: 'operation' | 'workflow';
   id: string;
+  pageId: string;
+  commandName: string;
+  bffName: string;
   title: string;
   entity: string;
   opKind: string;            // operation CRUD/intent kind: create|update|query|view|... (l4 operation.kind)
@@ -180,13 +183,6 @@ function collectModuleOntology(
     for (const [entityId, raw] of Object.entries(ents)) {
       if (!isRecord(raw)) continue;
       entityToModule.set(entityId, moduleName);
-      upsertEntity(entities, {
-        entityId,
-        title: readString(raw.title) || entityId,
-        kind: (readString(raw.kind) as EntityKind) || 'core',
-        ownership: readString(raw.ownership) || 'moduleOwned',
-        moduleName,
-      });
     }
   }
   const rels = Array.isArray(moduleDefs.relationships) ? moduleDefs.relationships : [];
@@ -218,6 +214,9 @@ function ownerFrom(
   return {
     kind,
     id,
+    pageId: readString(obj.pageId),
+    commandName: readString(obj.commandName),
+    bffName: readString(obj.bffName),
     title: readString(obj.title) || id,
     entity,
     opKind: readString(obj.kind),

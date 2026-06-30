@@ -5,19 +5,18 @@ Documento auto-contido (não depende de outros arquivos).
 
 ## Propósito
 
-Olhar o `statusBackend` dos owners e **fazer só o que está pendente** (um "to-be"): criar/atualizar/remover os **artefatos de backend** do módulo a partir da **ontologia + operations/workflows/rules** (a intenção) e dos **bffCommands** de cada página (o contrato com o frontend). Materializa os `.defs.ts → .ts`. No fim, muda o `statusBackend`. Pode ser chamado **a qualquer momento** e fazer **um único item** (uma tabela, um usecase, um adapter, um arquivo). Idempotente.
+Olhar o `statusBackend` dos owners e **fazer só o que está pendente** (um "to-be"): criar/atualizar/remover os **artefatos de backend** do módulo a partir da **ontologia + operations/workflows/rules** (a intenção) e dos contratos BFF de cada página (o contrato com o frontend). Materializa os `.defs.ts → .ts`. No fim, muda o `statusBackend`. Pode ser chamado **a qualquer momento** e fazer **um único item** (uma tabela, um usecase, um adapter, um arquivo). Idempotente.
 
 A partir desta versão o backend é organizado em **3 camadas, modelo hexagonal (ports & adapters)** — antes eram 4. Ver "Arquitetura de 3 camadas".
 
 ## Modelo compartilhado (contexto auto-contido)
 
 **Camadas de origem (intenção, lidas — no projeto do cliente, ex.: `mls-102043`):**
-- `l5/{module}/ontology/*` — entidades de dado.
-- `l5/{module}/rules.defs.ts` — regras de negócio.
-- `l5/{module}/module.defs.ts` — mapa de domínio.
+- `l4/{module}/ontology/*` — entidades de dado canônicas.
+- `l4/rules/*` — regras de negócio.
+- `l4/{module}/module.defs.ts` — índice de ontologia, relacionamentos e contexto de design.
 - `l4/operations/*`, `l4/workflows/*` — operações e workflows.
-- `l2/{module}/{page}.defs.ts` — páginas, com `bffCommands[]` (o contrato de intenção do BFF).
-- `l2/{module}/web/contracts/{page}.ts` — contrato por página (Input/Output exatos que o frontend espera). **Consumido**, não autorado por este agente.
+- `l2/{module}/web/contracts/{page}.defs.ts` / `.ts` — contrato por página (Input/Output exatos que o frontend espera). **Consumido**, não autorado por este agente.
 
 **Camada de destino (artefatos de backend, escritos — no projeto do cliente):** `l1/{module}/...` nas 3 camadas hexagonais abaixo. Materializa `.defs.ts → .ts` (L1).
 
@@ -27,7 +26,7 @@ A partir desta versão o backend é organizado em **3 camadas, modelo hexagonal 
 - **Operation** = ação direta sobre 1 entidade → entidade de domínio + tabela/port/adapter de persistência + usecase. Declara `reads`/`writes` por **id de ontologia**; o backend deriva as tabelas.
 - **Workflow** = processo → orquestra operations; pode implicar usecases de orquestração, domain-services/events e efeitos de persistência (status/eventos).
 - **Ontology** = entidades de dado → entidade de domínio (`layer_3_domain`) + tabela (`adapters/persistence`) derivada dela.
-- **Page (bffCommands)** = contato com o frontend → controller HTTP + rota (`adapters/http`).
+- **Page contract (BFF commands)** = contato com o frontend → controller HTTP + rota (`adapters/http`).
 
 **Status de reconciliação (DOIS campos independentes no item de Workflow/Operation):**
 `statusFrontend` e `statusBackend`, cada um com o enum `toCreate | toUpdate | toRemove | inProgress | done`.
@@ -142,10 +141,10 @@ Promover um campo de dentro do `details` para coluna só quando ele passa a ser 
 
 O `l1` (backend) conversa com o frontend via **BFF**: cada **página** tem funções que chamam o backend, e o backend **retorna exatamente o que a página precisa — nem mais, nem menos**.
 
-- Cada página declara `bffCommands[]` (em `l2/{module}/{page}.defs.ts`): `{ commandName, purpose, kind:'query'|'command'|'mutation', input[], output[], readsEntities/writesEntities, usecaseRefs[], rulesApplied[] }`.
-- O backend materializa **1 controller por página** em `adapters/http/controllers/{page}.ts`, com **1 handler por `bffCommand`** (nome `{module}{PascalCase(page)}{PascalCase(command)}Handler`).
+- Cada página declara comandos BFF em `l2/{module}/web/contracts/{page}.defs.ts`: `{ commandName, routeKey, purpose, kind:'query'|'command'|'mutation', input[], output[], origin }`. `origin` é só rastreio leve para o owner L4; não carrega tabela/usecase/regra/provenance de campo.
+- O backend materializa controllers a partir dos owners L4. Cada handler usa `owner.bffName` como rota compartilhada, com fallback `{module}.{pageId}.{commandName}` apenas para L4 legado.
 - Cada handler: valida só a **borda** (campos obrigatórios/shape → `VALIDATION_ERROR` 400), chama o **usecase** (`layer_2_application`, importando função + tipos I/O) e **molda a resposta no shape exato do contrato** `l2/{module}/web/contracts/{page}.ts` (mapeia nomes se o usecase devolver snake_case). Nada além disso.
-- Uma **rota** por command é registrada no router com chave `{module}.{page}.{command}` → handler.
+- Uma **rota** por command é registrada no router com a chave canônica `bffName`/`routeKey` → handler.
 - O handler **não** toca domínio nem persistência direto (sem `ctx.data`, sem import de `adapters/persistence`): a regra de negócio é do usecase/domínio.
 
 ## Mapeamento 4 camadas → 3 camadas (migração)
@@ -161,7 +160,7 @@ O `l1` (backend) conversa com o frontend via **BFF**: cada **página** tem funç
 
 ## Responsabilidade deste agente
 
-1. **Varrer** os owners (Operations/Workflows/Ontology e páginas com `bffCommands`) com `statusBackend` ≠ `done` — ou processar **um item específico** recebido como argumento.
+1. **Varrer** os owners (Operations/Workflows/Ontology e contratos BFF quando existirem) com `statusBackend` ≠ `done` — ou processar **um item específico** recebido como argumento.
 2. Para cada item pendente:
    - `toCreate` / `toUpdate`: derivar/atualizar os artefatos das 3 camadas — entidade de domínio (+ value-objects/rules/events quando aplicável), port + adapter de persistência, tabela(s)/métrica(s), usecase(s), controller HTTP + rota (BFF), e **materializar** (`.defs.ts → .ts`).
    - `toRemove`: remover/deprecar artefato + `.ts` materializado (cascata; **cuidado com dados** — marcar `deprecated` e exigir confirmação antes de drop real de tabela).
@@ -177,7 +176,7 @@ O `l1` (backend) conversa com o frontend via **BFF**: cada **página** tem funç
 
 ## Entrada / Saída
 
-- **Entrada:** intenção do módulo (ontologia + operations/workflows + rules + `statusBackend`) e `bffCommands` das páginas + contrato por página. Opcional: um item específico (tabela/usecase/entity/adapter) para processar só ele.
+- **Entrada:** intenção do módulo (ontologia + operations/workflows + rules + `statusBackend`) e contrato BFF por página quando já existir. Opcional: um item específico (tabela/usecase/entity/adapter) para processar só ele.
 - **Saída:** artefatos de backend em `l1/{module}` (3 camadas) criados/atualizados/removidos, materializados em `.ts`, e `statusBackend` dos itens processados atualizado.
 
 ## Status (statusBackend)
@@ -192,6 +191,6 @@ Pega itens com `statusBackend` ≠ `done`; ao iniciar seta `statusBackend = inPr
 
 ## Referências de artefato
 
-- Lê: `l5/{module}/ontology/*` + `rules.defs.ts` + `module.defs.ts`, `l4/operations/*`, `l4/workflows/*`, `l2/{module}/{page}.defs.ts` (`bffCommands`) e `l2/{module}/web/contracts/{page}.ts`.
+- Lê: `l4/{module}/ontology/*` + `l4/rules/*` + `l4/{module}/module.defs.ts`, `l4/operations/*`, `l4/workflows/*` e `l2/{module}/web/contracts/{page}.defs.ts` / `.ts` quando existirem.
 - Escreve: `l1/{module}/layer_3_domain/*`, `l1/{module}/layer_2_application/*`, `l1/{module}/layer_1_external/adapters/*` (http, persistence, queues, webhooks, cron, plugins) + `.ts` materializado.
 - Reusa: materialização L1 já existente (102021 `agentMaterializeSolution` — `agentPrepareDefsL1` acrescenta o `pipeline`, `agentMaterializeL1Def` resolve o item, `agentMaterializeGen` gera o `.ts`).

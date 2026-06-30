@@ -1,8 +1,8 @@
 /// <mls fileReference="_102021_/l2/agentChangeBackend/agentCbBffIndex.ts" enhancement="_102027_/l2/enhancementAgent"/>
 
-// LLM planning (conditional): when page bffCommands + contracts exist (produced by agentChangeFrontend),
-// map them to one http controller per page (+ route keys). If no contract exists yet, skip the LLM and
-// continue to domain generation — backend usecases/persistence do not depend on the frontend.
+// LLM planning (conditional): when page contracts exist (produced by agentChangeFrontend), index
+// their BFF commands and route keys. If no contract exists yet, skip the LLM and continue to domain
+// generation — backend usecases/persistence do not depend on the frontend.
 
 import { IAgentAsync, IAgentMeta } from '/_102027_/l2/aiAgentBase.js';
 import {
@@ -19,14 +19,21 @@ export function createAgent(): IAgentAsync {
   return { agentName: AGENT_NAME, agentProject: 102021, agentFolder: 'agentChangeBackend', agentDescription: 'Map page bffCommands to http controllers (when contracts exist)', visibility: 'private', beforePromptStep, afterPromptStep };
 }
 
-async function readContracts(): Promise<{ pageId: string; commands: string[] }[]> {
+type BffContractCommand = { commandName: string; routeKey?: string };
+
+async function readContracts(): Promise<{ pageId: string; commands: BffContractCommand[] }[]> {
   const project = mls.actualProject || 0;
-  const pages: { pageId: string; commands: string[] }[] = [];
+  const pages: { pageId: string; commands: BffContractCommand[] }[] = [];
   for (const file of Object.values(mls.stor.files) as any[]) {
     if (!file || file.project !== project || file.level !== 2 || file.status === 'deleted') continue;
     if (file.extension !== '.defs.ts' || !String(file.folder || '').endsWith('/web/contracts')) continue;
     const parsed = parseDefsSource(String(await file.getContent()));
-    const commands = Array.isArray(parsed) ? parsed.filter(isRecord).map((c: any) => String(c.commandName || '')).filter(Boolean) : [];
+    const commands = Array.isArray(parsed) ? parsed.filter(isRecord).map((c: any): BffContractCommand | null => {
+      const commandName = String(c.commandName || '').trim();
+      if (!commandName) return null;
+      const routeKey = String(c.routeKey || '').trim();
+      return routeKey ? { commandName, routeKey } : { commandName };
+    }).filter((c): c is BffContractCommand => !!c) : [];
     pages.push({ pageId: String(file.shortName || ''), commands });
   }
   return pages;
@@ -41,7 +48,7 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'No page contract; BFF skipped.'),
     ];
   }
-  const human = `## Page contracts (bffCommands)\n${JSON.stringify(pages, null, 2)}\n\nMap each page to one controller (one handler per command) + route keys {module}.{page}.{command}.`;
+  const human = `## Page contracts (BFF commands)\n${JSON.stringify(pages, null, 2)}\n\nIndex the page contracts. Use command.routeKey as canonical when present; {module}.{page}.{command} is only a legacy fallback. Emit commands[] as commandName strings in the tool output.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
@@ -69,7 +76,7 @@ const systemPrompt = `
 <!-- modelType: codepro -->
 <!-- x-tool-strict: true -->
 
-You are ${AGENT_NAME}. For each page, define one controller (one handler per bffCommand) and route
-keys {module}.{page}.{command}. Each handler returns EXACTLY the page contract Output. Call
+You are ${AGENT_NAME}. For each page, index its BFF commands. Reuse command.routeKey when present;
+derive {module}.{page}.{command} only as a legacy fallback. Each handler returns EXACTLY the page contract Output. Call
 "{{toolName}}". No prose.
 `;
