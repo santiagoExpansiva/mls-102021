@@ -224,57 +224,85 @@ async function main(): Promise<void> {
   const failures: string[] = [];
   for (let i = 0; i < todo.length; i++) {
     const p = todo[i];
-    const n = `${i + 1}/${todo.length}`;
-    const base = path.basename(p.item.outputPath);
-    const data = dataByOut.get(p.item.outputPath);
-    const { system, human, skillReport, depReport } = assemble(p.item, data, modelType);
-    const miss = [...skillReport, ...depReport].filter((s) => s.startsWith('MISS'));
-
+    const label = `[${i + 1}/${todo.length}]`;
     if (args.dryRun || !cfg) {
+      const { system, human } = assemble(p.item, dataByOut.get(p.item.outputPath), modelType);
       const dir = path.join(outDir, p.item.id.replace(/\W+/g, '_'));
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'system.md'), system);
       fs.writeFileSync(path.join(dir, 'human.md'), human);
-      console.log(`[${n}] ${base}  -> prompt`);
+      console.log(`${label} ${path.basename(p.item.outputPath)}  -> prompt`);
       continue;
     }
-
-    process.stdout.write(`[${n}] ${base} ... `);
-    const r = await callCollabLlm(cfg, { model: modelType, system, human });
-    const code = r.ok && r.code ? applyHeader(p.item.outputPath, r.code) : '';
-
-    if (tracePath) {
-      const sec = [
-        `=== ${new Date().toISOString()} | ${p.item.id} (${p.item.type}) ===`,
-        `output: ${p.item.outputPath}`,
-        `model:  ${modelType}    status: ${r.ok ? 'ok' : `error(${r.httpStatus})`}`,
-        r.ok ? `bytes:  ${code.length}` : `error:  ${r.error ?? 'unknown'}`,
-        `skills: ${skillReport.join(' | ') || '(none)'}`,
-        `deps:   ${depReport.join(' | ') || '(none)'}`,
-        `usage:  ${r.usage ? JSON.stringify(r.usage) : '(none)'}`,
-      ];
-      if (!r.ok) sec.push('--- raw (capped) ---', r.raw.slice(0, TRACE_RAW_CAP));
-      sec.push('', '');
-      fs.appendFileSync(tracePath, sec.join('\n'));
-    }
-
-    if (!r.ok || !code) {
-      console.log(`FAIL: ${r.error ?? 'no code'}`);
-      failures.push(p.item.id);
-      continue;
-    }
-    const outAbs = mlsToFs(p.item.outputPath);
-    fs.mkdirSync(path.dirname(outAbs), { recursive: true });
-    fs.writeFileSync(outAbs, code);
-    console.log(`ok ${code.length}b${miss.length ? `  (ctx MISS: ${miss.length})` : ''}`);
+    const res = await materializeOne(p, modelType, cfg, dataByOut.get(p.item.outputPath), tracePath, label);
+    if (!res.ok) failures.push(p.item.id);
   }
   const okCount = todo.length - failures.length;
   console.log(`\ndone: ${okCount}/${todo.length} file(s) ${args.dryRun ? 'prepared' : 'generated'}.`);
   if (tracePath) console.log(`trace: ${tracePath}`);
-  if (failures.length) { console.log(`FAILURES (${failures.length}): ${failures.join(', ')}`); process.exitCode = 1; }
-  if (args.check && args.project && args.moduleName) {
-    if (!runCheck(args.project, args.moduleName)) process.exitCode = 2;
+
+  // ── Repair loop (level 1+3): tsc the module, then RE-PROMPT each file that failed tsc (errors fed
+  // back into the prompt) or that produced no .ts (truncated before the tool call). Bounded retries.
+  if (!args.dryRun && cfg && args.check && args.project && args.moduleName) {
+    const REPAIR_ROUNDS = 2;
+    let check = runCheckCapture(args.project, args.moduleName);
+    for (let round = 1; round <= REPAIR_ROUNDS && !check.ok; round++) {
+      const errorsByFile = parseTscErrorsByFile(check.output);
+      const targets = planned.filter((p) => {
+        const abs = mlsToFs(p.item.outputPath);
+        return errorsByFile.has(abs) || (failures.includes(p.item.id) && !fs.existsSync(abs));
+      });
+      if (!targets.length) { console.log('\nrepair: no regenerable file matches the tsc errors — stopping.'); break; }
+      console.log(`\nrepair round ${round}/${REPAIR_ROUNDS}: ${targets.length} file(s)`);
+      for (const p of targets) {
+        const errs = errorsByFile.get(mlsToFs(p.item.outputPath));
+        const hint = errs && errs.length
+          ? `## Repair\nThe file you generated failed TypeScript checking with these errors:\n\n${errs.join('\n')}\n\nReturn the COMPLETE corrected file via the tool. Fix exactly these errors; keep everything else unchanged.`
+          : `## Repair\nThe previous attempt produced NO file (the response was truncated before the tool call). Return ONLY the tool call with the COMPLETE file — do NOT write any analysis or step-by-step reasoning before calling the tool.`;
+        const res = await materializeOne(p, modelType, cfg, dataByOut.get(p.item.outputPath), tracePath, '[repair]', hint);
+        if (res.ok) { const k = failures.indexOf(p.item.id); if (k >= 0) failures.splice(k, 1); }
+      }
+      check = runCheckCapture(args.project, args.moduleName);
+    }
+    console.log(check.ok ? '\ntsc: OK' : '\ntsc: errors remain after repair (see below)');
+    if (!check.ok) { console.log(check.output.trim()); process.exitCode = 2; }
+  } else if (failures.length) {
+    console.log(`FAILURES (${failures.length}): ${failures.join(', ')}`); process.exitCode = 1;
   }
+}
+
+// Generate ONE file (assemble prompt -> collab-llm -> applyHeader -> write). repairHint, when present,
+// is appended to the human prompt (tsc errors to fix, or "output only the tool call"). Shared by the
+// first pass and the repair loop.
+async function materializeOne(
+  p: PlannedItem, modelType: string, cfg: LlmConfig, data: unknown,
+  tracePath: string | null, label: string, repairHint?: string,
+): Promise<{ ok: boolean; error?: string }> {
+  const { system, human, skillReport, depReport } = assemble(p.item, data, modelType);
+  const humanFull = repairHint ? `${human}\n\n${repairHint}` : human;
+  process.stdout.write(`${label} ${path.basename(p.item.outputPath)}${repairHint ? ' (repair)' : ''} ... `);
+  const r = await callCollabLlm(cfg, { model: modelType, system, human: humanFull });
+  const code = r.ok && r.code ? applyHeader(p.item.outputPath, r.code) : '';
+  if (tracePath) {
+    const sec = [
+      `=== ${new Date().toISOString()} | ${p.item.id} (${p.item.type})${repairHint ? ' [repair]' : ''} ===`,
+      `output: ${p.item.outputPath}`,
+      `model:  ${modelType}    status: ${r.ok ? 'ok' : `error(${r.httpStatus})`}`,
+      r.ok ? `bytes:  ${code.length}` : `error:  ${r.error ?? 'unknown'}`,
+      `skills: ${skillReport.join(' | ') || '(none)'}`,
+      `deps:   ${depReport.join(' | ') || '(none)'}`,
+      `usage:  ${r.usage ? JSON.stringify(r.usage) : '(none)'}`,
+    ];
+    if (!r.ok) sec.push('--- raw (capped) ---', r.raw.slice(0, TRACE_RAW_CAP));
+    sec.push('', '');
+    fs.appendFileSync(tracePath, sec.join('\n'));
+  }
+  if (!r.ok || !code) { console.log(`FAIL: ${r.error ?? 'no code'}`); return { ok: false, error: r.error ?? 'no code' }; }
+  const outAbs = mlsToFs(p.item.outputPath);
+  fs.mkdirSync(path.dirname(outAbs), { recursive: true });
+  fs.writeFileSync(outAbs, code);
+  console.log(`ok ${code.length}b`);
+  return { ok: true };
 }
 
 // ─── Trace (collab-llm responses per run) ────────────────────────────────────
@@ -319,6 +347,44 @@ function runCheck(project: number, moduleName: string): boolean {
   } finally {
     try { fs.unlinkSync(tmp); } catch { /* ignore */ }
   }
+}
+
+// Same scoped tsc as runCheck, but CAPTURES the output (for the repair loop to parse errors per file).
+function runCheckCapture(project: number, moduleName: string): { ok: boolean; output: string } {
+  const tmp = path.join(os.tmpdir(), `matL1-tsconfig-${Date.now()}.json`);
+  fs.writeFileSync(tmp, JSON.stringify({
+    extends: path.join(ROOT, 'tsconfig.backend.json'),
+    compilerOptions: { noEmit: true, typeRoots: [path.join(ROOT, 'node_modules', '@types')] },
+    include: [path.join(ROOT, `mls-${project}`, 'l1', moduleName, '**', '*.ts')],
+  }));
+  const localTsc = path.join(ROOT, 'node_modules', '.bin', 'tsc');
+  const bin = fs.existsSync(localTsc) ? localTsc : 'npx';
+  const binArgs = bin === 'npx' ? ['tsc', '-p', tmp] : ['-p', tmp];
+  console.log(`\nchecking ${project}/${moduleName} with tsc...`);
+  try {
+    execFileSync(bin, binArgs, { cwd: ROOT, encoding: 'utf8' });
+    return { ok: true, output: '' };
+  } catch (e) {
+    const err = e as { stdout?: Buffer | string; stderr?: Buffer | string };
+    return { ok: false, output: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+  } finally {
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+  }
+}
+
+// Group tsc "file.ts(line,col): error TSxxxx: ..." lines by absolute file path.
+function parseTscErrorsByFile(output: string): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const raw of output.split(/\r?\n/)) {
+    const line = raw.trim();
+    const m = /^(.+?\.ts)\(\d+,\d+\):\s*error\s+TS\d+/.exec(line);
+    if (!m) continue;
+    const file = m[1].replace(/\\/g, '/');
+    const abs = path.isAbsolute(file) ? file : path.join(ROOT, file);
+    const arr = map.get(abs);
+    if (arr) arr.push(line); else map.set(abs, [line]);
+  }
+  return map;
 }
 
 // modelType override comes from the config (optional). Kept tiny + separate for clarity.

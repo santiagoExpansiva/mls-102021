@@ -7,6 +7,6 @@
   "toolStrict": true,
   "timeoutMs": 200000,
   "temperature": 0,
-  "maxTokens": 32000,
+  "maxTokens": 65536,
   "modelTypeOverride": "codehigh"
 }

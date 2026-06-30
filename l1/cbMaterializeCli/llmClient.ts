@@ -18,7 +18,7 @@ export interface LlmConfig {
   toolStrict?: boolean;     // x-tool-strict header (schema-validate tool args)
   timeoutMs?: number;       // request timeout (default 200000)
   temperature?: number;     // default 0
-  maxTokens?: number;       // default 8000
+  maxTokens?: number;       // default 65536 (reasoning models need room: they draft in the reasoning channel before the tool_call)
 }
 
 interface HttpResponse { ok: boolean; status: number; statusText: string; text: string; }
@@ -105,7 +105,7 @@ export async function callCollabLlm(cfg: LlmConfig, input: LlmCallInput): Promis
     ],
     stream: false,
     temperature: cfg.temperature ?? 0,
-    max_tokens: cfg.maxTokens ?? 32000,
+    max_tokens: cfg.maxTokens ?? 65536,
     tools: [GEN_TOOL],
     tool_choice: { type: 'function', function: { name: GEN_TOOL_NAME } },
   };
