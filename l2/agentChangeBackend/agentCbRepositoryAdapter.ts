@@ -67,7 +67,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       await saveDefs(fi, `${lowerFirst(entityId)}RepositoryAdapter`, buildArtifact('repositoryAdapter', `${entityId}RepositoryAdapter`, module, AGENT_NAME, item), pipeline);
       saved++;
     }
-    console.log(`${logPrefix(agent)} saved ${saved} repository adapter defs`);
     if (out.status === 'failed') { status = 'failed'; trace = 'model returned failed'; }
   } catch (error) {
     status = 'failed';

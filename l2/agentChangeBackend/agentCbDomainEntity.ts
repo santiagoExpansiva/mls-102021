@@ -59,7 +59,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       await saveDefs(fi, `${lowerFirst(entityId)}DomainEntity`, buildArtifact('domainEntity', entityId, module, AGENT_NAME, item), pipeline);
       saved++;
     }
-    console.log(`${logPrefix(agent)} saved ${saved} domain entity defs`);
     if (out.status === 'failed') { status = 'failed'; trace = 'model returned failed'; }
   } catch (error) {
     status = 'failed';

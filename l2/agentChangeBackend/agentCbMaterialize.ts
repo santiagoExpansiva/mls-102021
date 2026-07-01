@@ -106,8 +106,9 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
         createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `nothing stale to materialize (from L${minRank})`),
       ];
     }
-    const remainingLayers = byRank.size;
-    const rank = Math.min(...byRank.keys());
+    const ranksSorted = [...byRank.keys()].sort((a, b) => a - b);
+    const remainingLayers = ranksSorted.length;
+    const rank = ranksSorted[0];
     const bucket = byRank.get(rank)!;
     const planId = `cb-mat-L${rank}`;
     const refs = bucket.map(e => e.defRef);
@@ -115,17 +116,19 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
     const label = layerLabel([...new Set(bucket.map(e => e.item.type))]);
     const intents: mls.msg.AgentIntent[] = [
       // Current layer starts now (its inner layers are already materialized -> no dependsOn needed).
-      createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar ${label} {{completed}}/{{total}}, falhas {{failed}}`, refs, [], 5),
+      createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar ${label} {{completed}}/{{total}}, falhas {{failed}}`, refs, [], 10),
     ];
     if (remainingLayers > 1) {
       // More layers to go: a continue-dispatcher runs ONLY after this layer completes (real barrier),
-      // then re-dispatches (minRank = rank+1) to spawn the next outer stale layer.
-      intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload(`cb-mat-after-L${rank}`, AGENT_NAME, 'Materializar (próxima camada)', { planId: 'cb-materialize', minRank: rank + 1 }, [planId], 'sequential', 'waiting_dependency')));
+      // then re-dispatches (minRank = rank+1) to spawn the next outer stale layer. Title names the NEXT
+      // layer's content (not a generic "próxima camada") so the step list stays readable.
+      const nextRank = ranksSorted[1];
+      const nextLabel = layerLabel([...new Set(byRank.get(nextRank)!.map(e => e.item.type))]);
+      intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload(`cb-mat-after-L${rank}`, AGENT_NAME, `Materializar ${nextLabel}`, { planId: 'cb-materialize', minRank: rank + 1 }, [planId], 'sequential', 'waiting_dependency')));
     } else {
       // Last stale layer: register runs after it materializes.
       intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload('cb-register', 'agentCbRegister', 'Registrar backend', { planId: 'cb-register' }, [planId], 'sequential', 'waiting_dependency')));
     }
-    console.log(`${logPrefix(agent)} materialize layer ${label} (rank ${rank}, minRank ${minRank}): ${refs.length} file(s); ${remainingLayers - 1} layer(s) remaining`);
     intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `materializing ${label} (${refs.length} file(s)); ${remainingLayers - 1} layer(s) after`));
     return intents;
   } catch (error) {
@@ -205,7 +208,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     if (!p) throw new Error(`invalid outputPath: ${item.outputPath}`);
     const ok = await saveGeneratedTs(p.project, p.level, p.folder, p.shortName, code);
     if (!ok) throw new Error('saveGeneratedTs failed');
-    console.log(`${logPrefix(agent)} materialized ${item.outputPath} (${code.length}b)`);
   } catch (error) {
     status = 'failed';
     trace = error instanceof Error ? error.message : String(error);

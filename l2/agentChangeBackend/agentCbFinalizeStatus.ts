@@ -17,7 +17,6 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     for (const owner of scan.owners) {
       if (await setOwnerStatusBackend(owner, 'done')) done++;
     }
-    console.log(`${logPrefix(agent)} statusBackend done for ${done}/${scan.owners.length} owner(s)`);
     return [
       enqueueNext(context, parentStep, step, 'cb-final-summary', 'agentCbFinalSummary', 'Resumo do run', { ownersDone: done }),
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Marked ${done} owner(s) done.`),

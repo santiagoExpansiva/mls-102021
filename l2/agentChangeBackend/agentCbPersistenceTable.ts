@@ -58,7 +58,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
       await saveDefs(fi, `${lowerFirst(tableId)}TableDefinition`, buildArtifact('table', tableId, module, AGENT_NAME, item), pipeline);
       saved++;
     }
-    console.log(`${logPrefix(agent)} saved ${saved} table defs`);
     if (out.status === 'failed') { status = 'failed'; trace = 'model returned failed'; }
   } catch (error) {
     status = 'failed';

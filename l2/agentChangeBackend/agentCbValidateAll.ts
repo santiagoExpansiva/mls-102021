@@ -95,16 +95,19 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       if (!tsSet.has(`${d.folder}::${d.shortName}`)) missing.push(`materialization incomplete -> ${d.folder}/${d.shortName}.ts not generated from its .defs.ts`);
     }
     const warnings = mdmTableViolations > 0 ? [`${mdmTableViolations} MDM table artifact(s) found in persistence (should be 0)`] : [];
-    console.log(`${logPrefix(agent)} l1Defs=${l1Defs} owners=${scan.owners.length} missing=${missing.length} warnings=${warnings.length}`);
 
     if (missing.length) {
       const trace = `INTEGRITY FAILED: ${missing.length} missing-defs reference(s): ${[...new Set(missing)].slice(0, 30).join('; ')}`;
       console.error(`${logPrefix(agent)} ${trace}`);
       return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'failed', trace)];
     }
+    // Record the warning details on the step log too (not just the count), so they are visible in the trace.
+    const okTrace = warnings.length
+      ? `l1 defs=${l1Defs}; ${warnings.length} warning(s): ${warnings.slice(0, 12).join('; ')}`
+      : `l1 defs=${l1Defs}; 0 warnings.`;
     return [
       enqueueNext(context, parentStep, step, 'cb-finalize', 'agentCbFinalizeStatus', 'Finalizar statusBackend', {}),
-      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `l1 defs=${l1Defs}; warnings=${warnings.length}.`),
+      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', okTrace),
     ];
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

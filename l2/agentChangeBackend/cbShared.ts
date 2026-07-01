@@ -583,7 +583,7 @@ export function createParallelStepIntent(
   stepTitle: string,
   args: string[],
   dependsOn: string[] = [],
-  maxParallel = 5,
+  maxParallel = 10,
 ): mls.msg.AgentIntentAddStep {
   const step = createAgentStepPayload(planId, agentName, stepTitle, {}, dependsOn, 'parallel_dynamic', 'in_progress');
   step.interaction = {

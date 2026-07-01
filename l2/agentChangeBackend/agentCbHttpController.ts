@@ -113,7 +113,6 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       await saveDefs(fi, `${lowerFirst(ownerId)}Controller`, buildArtifact('httpController', ownerId, module, AGENT_NAME, data), pipeline);
       saved++;
     }
-    console.log(`${logPrefix(agent)} saved ${saved} controller defs (l4-driven; ${contracts.size} contract(s) for refinement)`);
     // /rebuild defs stops at the .defs.ts (no .ts materialization): skip cb-materialize, go to cb-register.
     const defsOnly = readCliCommand(context) === 'rebuild-defs';
     const next = defsOnly

@@ -3,7 +3,7 @@
 // Generate the usecases (layer_2_application/usecases), ONE per pending operation/workflow. To keep
 // each LLM response small (the per-usecase defs carry explicit functions[] input/output), this agent
 // fans out via the runtime's parallel_dynamic/progress: a DISPATCHER step (deterministic, no LLM)
-// emits ONE parallel step whose args queue = the owner ids (createParallelStepIntent, maxParallel 5).
+// emits ONE parallel step whose args queue = the owner ids (createParallelStepIntent, maxParallel 10).
 // The runtime runs the workers in a pool of 5 slots and DISCARDS each child's payload as it finishes
 // (the task stays small), instead of keeping N persistent steps. Each WORKER (same agent, reached with
 // its ownerId in hook.args) does one LLM call and saves one usecase .defs.ts. The controller step JOINS
@@ -108,12 +108,11 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
     // stepTitle is used by the runtime as the progress templateTitle ({{completed}}/{{total}}/{{failed}}
     // are substituted live as workers finish), e.g. "Gerar usecases 27/27, falhas 0".
     const intents: mls.msg.AgentIntent[] = [
-      createParallelStepIntent(context, parentStep, FANOUT_PLAN_ID, AGENT_NAME, 'Gerar usecases {{completed}}/{{total}}, falhas {{failed}}', ownerIds, [], 5),
+      createParallelStepIntent(context, parentStep, FANOUT_PLAN_ID, AGENT_NAME, 'Gerar usecases {{completed}}/{{total}}, falhas {{failed}}', ownerIds, [], 10),
     ];
     // Controller joins on the single parallel parent (runs after every worker finished).
     const cstep = createAgentStepPayload('cb-gen-http', 'agentCbHttpController', 'Gerar controllers HTTP (BFF)', { planId: 'cb-gen-http' }, [FANOUT_PLAN_ID], 'sequential', 'waiting_dependency');
     intents.push(createAddStepIntent(context, parentStep, cstep));
-    console.log(`${logPrefix(agent)} parallel fan-out: ${ownerIds.length} usecase(s)`);
     intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `fan-out ${ownerIds.length} usecase(s) (parallel_dynamic)`));
     return intents;
   } catch (error) {
@@ -181,7 +180,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     ];
     const pipeline = [buildPipelineItem(lowerFirst(usecaseId), 'applicationUsecase', fi, dependsFiles, layerSkills('applicationUsecase.md'), { rulesApplied: readStringArray(result?.rulesApplied) })];
     await saveDefs(fi, `${lowerFirst(usecaseId)}Usecase`, buildArtifact('usecase', usecaseId, module, AGENT_NAME, result), pipeline);
-    console.log(`${logPrefix(agent)} saved usecase ${usecaseId} (ports=${ports.join(',') || '-'} mdmRefs=${(result.mdmRefs as string[]).join(',') || '-'})`);
     if (out.status === 'failed') { status = 'failed'; trace = 'model returned failed'; }
   } catch (error) {
     status = 'failed';

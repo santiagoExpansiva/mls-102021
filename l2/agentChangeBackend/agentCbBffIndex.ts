@@ -42,7 +42,6 @@ async function readContracts(): Promise<{ pageId: string; commands: BffContractC
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   const pages = await readContracts();
   if (pages.length === 0) {
-    console.log(`${logPrefix(agent)} no page contract yet — skipping BFF, going to domain generation`);
     return [
       enqueueNext(context, parentStep, step, 'cb-gen-domain', 'agentCbDomainEntity', 'Gerar entidades de domínio', {}),
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'No page contract; BFF skipped.'),

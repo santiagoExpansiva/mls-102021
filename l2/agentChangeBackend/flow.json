@@ -337,7 +337,7 @@
       "dependsOn": [
         "cb-gen-usecase"
       ],
-      "maxParallel": 5,
+      "maxParallel": 10,
       "strictTool": true,
       "goal": "LLM WORKER per operation owner: one usecase file with explicit functions[] input/output, orchestrating domain + ports, appending its eventWrites in the same transaction. Progress: 'Gerar usecases {{completed}}/{{total}}, falhas {{failed}}'.",
       "savedArtifact": [
@@ -378,7 +378,7 @@
       "dependsOn": [
         "cb-materialize (spawned one rank at a time; each next layer waits on the previous via cb-mat-after-L{rank})"
       ],
-      "maxParallel": 5,
+      "maxParallel": 10,
       "goal": "LLM WORKER per .defs.ts of the current layer: generate the final .ts from the self-sufficient defs + dependsFiles (.d.ts) + skill. Layers in order: entidades de domínio(0) -> ports(1) -> tabelas(2) -> adapters(3) -> usecases(4) -> controllers(5). Progress: 'Materializar {layer} {{completed}}/{{total}}, falhas {{failed}}'.",
       "savedArtifact": [
         "l1/{module}/**/*.ts"

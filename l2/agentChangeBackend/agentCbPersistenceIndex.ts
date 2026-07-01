@@ -40,7 +40,6 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     const payload = step.interaction?.payload?.[0];
     if (!payload) throw new Error('missing payload');
     const out = extractPlannerOutput(payload, plannerConfig(TOOL_NAME));
-    console.log(`${logPrefix(agent)} tables=${asArray((out.result as any).tables).length}`);
     if (out.status === 'failed') { status = 'failed'; trace = 'model returned failed'; }
   } catch (error) {
     status = 'failed';

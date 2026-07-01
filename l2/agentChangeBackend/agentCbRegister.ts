@@ -71,7 +71,6 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       configMsg = `l5 config update failed: ${cfgError instanceof Error ? cfgError.message : String(cfgError)}`;
       console.warn(`${logPrefix(agent)} ${configMsg}`);
     }
-    console.log(`${logPrefix(agent)} tables=${moduleTables.join(',') || '(none)'} (MDM excluded); routes via controllers' exported routes; ${configMsg}`);
     return [
       enqueueNext(context, parentStep, step, 'cb-validate-all', 'agentCbValidateAll', 'Validar artefatos l1', {}),
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Registered ${moduleTables.length} module table(s). ${configMsg}`),

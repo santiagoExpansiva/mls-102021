@@ -23,9 +23,13 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       }
     }
     if (warnings.length) console.warn(`${logPrefix(agent)} ${warnings.length} warning(s): ${warnings.slice(0, 8).join('; ')}`);
+    // Record the warning details on the step log too (not just the count), so they are visible in the trace.
+    const preflightTrace = warnings.length
+      ? `Preflight: ${warnings.length} warning(s): ${warnings.slice(0, 12).join('; ')}`
+      : 'Preflight ok (0 warnings).';
     return [
       enqueueNext(context, parentStep, step, 'cb-lock', 'agentCbLockOwners', 'Lock owners (inProgress)', {}),
-      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Preflight ok (${warnings.length} warning(s)).`),
+      createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', preflightTrace),
     ];
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

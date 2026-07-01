@@ -17,7 +17,6 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     for (const owner of scan.owners) {
       if (await setOwnerStatusBackend(owner, 'inProgress')) locked++;
     }
-    console.log(`${logPrefix(agent)} locked ${locked}/${scan.owners.length} owner(s) -> inProgress`);
     return [
       enqueueNext(context, parentStep, step, 'cb-aggregate-index', 'agentCbAggregateIndex', 'Planejar agregados', {}),
       createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `Locked ${locked} owner(s).`),

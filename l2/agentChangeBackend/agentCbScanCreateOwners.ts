@@ -15,7 +15,6 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     // toCreate is the trigger; inProgress is treated as resumable (a previous run locked but did not
     // finish) so the reconciler is idempotent and never gets stuck after a partial run.
     const scan = await readBackendScan(['toCreate', 'inProgress']);
-    console.log(`${logPrefix(agent)} project=${scan.project} modules=${scan.moduleNames.join(',') || '(none)'} owners=${scan.owners.length} aggregates=${scan.aggregates.length}`);
     if (scan.owners.length === 0) {
       return [
         enqueueNext(context, parentStep, step, 'cb-final-summary', 'agentCbFinalSummary', 'Resumo (sem trabalho)', { noWork: true }),

@@ -53,7 +53,6 @@ function normalizePrompt(raw: string | undefined): string {
 async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.ExecutionContext, userPrompt: string): Promise<mls.msg.AgentIntent[]> {
   const raw = userPrompt || context.message.content || '';
   const cmd = parseCommand(raw);
-  console.log(`${logPrefix(agent)} entry userPrompt="${userPrompt}" content="${context.message.content}" -> cmd=${cmd}`);
 
   // The root agent step is created WITHOUT calling the model (skipRootLLM); the chain is added below.
   const addMessageAI: mls.msg.AgentIntentAddMessageAI = {
@@ -84,7 +83,6 @@ async function beforePromptImplicit(agent: IAgentMeta, context: mls.msg.Executio
       for (const owner of scan.owners) {
         if (await setOwnerStatusBackend(owner, 'toCreate')) reset++;
       }
-      console.log(`${logPrefix(agent)} ${cmd} — reset ${reset} owner(s) -> toCreate`);
     } catch (e) {
       console.error(`${logPrefix(agent)} ${cmd} reset failed: ${e instanceof Error ? e.message : String(e)}`);
     }
