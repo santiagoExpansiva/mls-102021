@@ -7,13 +7,15 @@
     "mode": "autonomous_scan",
     "noInputPolicy": "No user prompt. The agent receives no module/owner/item arguments; it discovers all actionable work from l4 statusBackend. (A single-item arg is an optional future convenience, not required.)",
     "noWorkBehavior": "If no owner with statusBackend = toCreate is found, finish without changing any file or status.",
-    "statusProcessedInV1": ["toCreate"]
+    "statusProcessedInV1": [
+      "toCreate"
+    ]
   },
   "source": {
     "spec": "_102021_/l2/agentChangeBackend/spec.md",
     "stage1Flow": "_102020_/l2/agentNewSolution2/flow.json",
     "siblingFlow": "_102020_/l2/agentChangeFrontend/flow.json (same autonomous create-only pattern, statusFrontend side)",
-    "tree": "_102021_/l2/agentChangeBackend/agentChangeBackend.ts (buildPlannedTree) — TO BUILD",
+    "tree": "_102021_/l2/agentChangeBackend/agentChangeBackend.ts + per-agent enqueueNext/dispatch (IMPERATIVE sequential chain; NOT a declarative planned tree). Two parallel_dynamic fan-outs: cb-usecase-fanout and cb-materialize (one layer per dispatch).",
     "schemas": "_102021_/l2/agentChangeBackend/cbSchemas.ts (strict JSON schemas; collab-llm enforces the tool call, cbExtract re-validates) — TO BUILD",
     "reused": "_102021_/l2/agentMaterializeSolution/* (agentPrepareDefsL1, agentMaterializeL1Def, agentMaterializeGen, templateMaterialize, registerBackEnd)"
   },
@@ -56,8 +58,15 @@
     "mdmPersistence": "MDM table persistence is EXCLUSIVELY 102034 (mdm_documents, mdm_documents_entities_index, ...). This flow NEVER emits an MDM TableDefinition and NEVER registers an MDM table in the manifest; it only reads via the shared MDM runtime. horizontalOwned follows the same principle.",
     "namingDeterminism": "All code identifiers derive deterministically from the canonical ontology entityId / operationId (Order -> domain Order, table order/orders, port OrderRepository, usecase createOrder). The PT title ('Pedido') is a UI label ONLY — never a file/class/column name. (Fixes the legacy Order -> pedidoEntity drift.)",
     "ownerStatus": {
-      "allowedToProcess": ["toCreate"],
-      "ignoredInV1": ["toUpdate", "toRemove", "inProgress", "done"],
+      "allowedToProcess": [
+        "toCreate"
+      ],
+      "ignoredInV1": [
+        "toUpdate",
+        "toRemove",
+        "inProgress",
+        "done"
+      ],
       "lockStatus": "inProgress",
       "successStatus": "done",
       "failureStatus": "leave as inProgress and write a trace record; v1 has no failed enum",
@@ -80,26 +89,52 @@
     "codeinstruct": {
       "provider": "azureai",
       "model": "gpt-5.2-codex",
-      "costAsProvided": { "input": "$1.75", "output": "$14.00" },
-      "recommendedFor": ["final .ts code generation (agentMaterializeGen)", "highest-risk code where correctness matters most"]
+      "costAsProvided": {
+        "input": "$1.75",
+        "output": "$14.00"
+      },
+      "recommendedFor": [
+        "final .ts code generation (agentMaterializeGen)",
+        "highest-risk code where correctness matters most"
+      ]
     },
     "codepro": {
       "provider": "azureai",
       "model": "Kimi-K2.6-1",
-      "costAsProvided": { "input": "$0.95", "output": "$4.00" },
-      "recommendedFor": ["schema-first defs generation (ports, adapters, controllers)", "pipeline resolution"]
+      "costAsProvided": {
+        "input": "$0.95",
+        "output": "$4.00"
+      },
+      "recommendedFor": [
+        "schema-first defs generation (ports, adapters, controllers)",
+        "pipeline resolution"
+      ]
     },
     "codeawsfast": {
       "provider": "bedrock",
       "model": "amazon.nova-pro-v1:0",
-      "costAsProvided": { "input": "$0.63", "output": "$5.00" },
-      "recommendedFor": ["low-cost summaries", "simple classification", "mechanical/non-critical steps"]
+      "costAsProvided": {
+        "input": "$0.63",
+        "output": "$5.00"
+      },
+      "recommendedFor": [
+        "low-cost summaries",
+        "simple classification",
+        "mechanical/non-critical steps"
+      ]
     },
     "codehigh": {
       "provider": "openrouter",
       "model": "z-ai/glm-5.2",
-      "costAsProvided": { "input": "$1", "output": "$3" },
-      "recommendedFor": ["reasoning-heavy planning: aggregate boundaries, JSONB/index decisions", "usecase orchestration", "pure domain entities"]
+      "costAsProvided": {
+        "input": "$1",
+        "output": "$3"
+      },
+      "recommendedFor": [
+        "reasoning-heavy planning: aggregate boundaries, JSONB/index decisions",
+        "usecase orchestration",
+        "pure domain entities"
+      ]
     }
   },
   "reads": [
@@ -129,32 +164,274 @@
     "ontology / operations / workflows / rules (consumed, never authored)"
   ],
   "steps": [
-    { "planId": "(root)", "agentName": "agentChangeBackend", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": [], "initialStatus": "waiting_human_input", "goal": "Root orchestrator. No input args. Start an autonomous scan for statusBackend = toCreate work and spawn the create chain. If the scan finds no work, finish immediately." },
-
-    { "planId": "scan-create-owners", "agentName": "agentCbScanCreateOwners", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["(root)"], "goal": "Deterministically read l4/l5 and select all owners (operations/workflows) with statusBackend = toCreate. toUpdate/toRemove/inProgress/done are reported but NOT processed in v1.", "output": "A create change-set: moduleName, selected operations/workflows, current statuses, source file refs.", "ifEmpty": "Complete the flow with no file/status writes." },
-    { "planId": "validate-l4-create-readiness", "agentName": "agentCbValidateL4Readiness", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["scan-create-owners"], "skipWhen": "scan selected no owners", "goal": "Deterministic preflight on the selected owners only: entity/operation ids resolve to canonical l4 ids; ontology kind + relationships present; rules resolve; no selected owner already inProgress/done.", "output": "Validated change-set + non-blocking warnings." },
-    { "planId": "lock-create-owners", "agentName": "agentCbLockOwners", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["validate-l4-create-readiness"], "goal": "Deterministically set statusBackend = inProgress for the validated toCreate owners. The only status mutation before successful completion." },
-
-    { "planId": "plan-aggregate-index", "agentName": "agentCbAggregateIndex", "type": "agent", "modelAlias": "codehigh", "executionMode": "sequential", "dependsOn": ["lock-create-owners"], "toolSchema": "CbAggregateIndexResult", "strictTool": true, "goal": "Derive aggregate boundaries from ontology kind + relationships. Emit aggregates[] {aggregateId, rootEntity, embeddedMembers[], events[], mdmRefs[]}. Deterministic ref check + checkpoint.", "savedArtifact": "l4/trace/checkpoint-cbAggregateIndex.json" },
-    { "planId": "plan-persistence-index", "agentName": "agentCbPersistenceIndex", "type": "agent", "modelAlias": "codehigh", "executionMode": "sequential", "dependsOn": ["plan-aggregate-index"], "toolSchema": "CbPersistenceIndexResult", "strictTool": true, "goal": "Apply the JSONB model per aggregate/event table: pick the few indexed columns (PK, queried FKs, status/lifecycle, ordering/filter timestamps); push everything else + child collections into details JSONB. Emit tables[] {tableId, ownership, indexedColumns[], detailsFields[], childCollections[]}. MDM produces NO table.", "savedArtifact": "l4/trace/checkpoint-cbPersistenceIndex.json" },
-    { "planId": "plan-usecase-index", "agentName": "agentCbUsecaseIndex", "type": "agent", "modelAlias": "codepro", "executionMode": "sequential", "dependsOn": ["plan-aggregate-index"], "toolSchema": "CbUsecaseIndexResult", "strictTool": true, "goal": "Map each pending operation/workflow to a usecase + the repository ports it needs (reads/writes -> aggregates). Emit usecases[] {usecaseId, operationId|workflowId, ports[], rulesApplied[]}.", "savedArtifact": "l4/trace/checkpoint-cbUsecaseIndex.json" },
-    { "planId": "plan-bff-index", "agentName": "agentCbBffIndex", "type": "agent", "modelAlias": "codepro", "executionMode": "sequential", "dependsOn": ["plan-usecase-index"], "skipWhen": "no page contract exists yet (frontend not run)", "toolSchema": "CbBffIndexResult", "strictTool": true, "goal": "When page bffCommands + contracts exist, index the available page contracts for Output refinement. Route keys must reuse L4 bffName / contract routeKey when present; {module}.{page}.{command} is only a legacy fallback. Emit pages[] {pageId, commands[], contractRef}.", "savedArtifact": "l4/trace/checkpoint-cbBffIndex.json" },
-
-    { "planId": "gen-domain-entity", "agentName": "agentCbDomainEntity", "type": "agent", "modelAlias": "codehigh", "executionMode": "parallel_dynamic", "dependsOn": ["plan-persistence-index"], "dynamicSource": { "sourcePlanId": "plan-aggregate-index", "selectorField": "aggregateId", "argsField": "aggregateId" }, "toolSchema": "CbDomainEntityResult", "strictTool": true, "goal": "Per aggregate: the PURE domain entity (canonical camelCase fields, invariants, status/lifecycle) + embedded supporting members as value-objects. No persistence, no ctx.data. Name from entityId.", "savedArtifact": ["l1/{module}/layer_3_domain/entities/{entity}.defs.ts", "l1/{module}/layer_3_domain/value-objects/*.defs.ts"] },
-    { "planId": "gen-repository-port", "agentName": "agentCbRepositoryPort", "type": "agent", "modelAlias": "codepro", "executionMode": "parallel_dynamic", "dependsOn": ["gen-domain-entity"], "dynamicSource": { "sourcePlanId": "plan-aggregate-index", "selectorField": "aggregateId", "argsField": "aggregateId" }, "toolSchema": "CbRepositoryPortResult", "strictTool": true, "goal": "Per aggregate: the repository PORT interface I{Entity}Repository (getById, list(filter), save(aggregate), domain finders), typed in domain terms. layer_2_application/ports.", "savedArtifact": "l1/{module}/layer_2_application/ports/{entity}Repository.defs.ts" },
-    { "planId": "gen-persistence-table", "agentName": "agentCbPersistenceTable", "type": "agent", "modelAlias": "codeawsfast", "executionMode": "parallel_dynamic", "dependsOn": ["gen-domain-entity"], "dynamicSource": { "sourcePlanId": "plan-persistence-index", "selectorField": "tableId", "argsField": "tableId" }, "toolSchema": "CbPersistenceTableResult", "strictTool": true, "goal": "Per table (core root + event): the TableDefinition derived deterministically from the domain entity + persistence index — indexed columns out, details JSONB for the rest, snake_case. MDM/horizontal entities produce NO table.", "savedArtifact": "l1/{module}/layer_1_external/adapters/persistence/{table}.defs.ts" },
-    { "planId": "gen-repository-adapter", "agentName": "agentCbRepositoryAdapter", "type": "agent", "modelAlias": "codepro", "executionMode": "parallel_dynamic", "dependsOn": ["gen-repository-port", "gen-persistence-table"], "dynamicSource": { "sourcePlanId": "plan-aggregate-index", "selectorField": "aggregateId", "argsField": "aggregateId" }, "toolSchema": "CbRepositoryAdapterResult", "strictTool": true, "goal": "Per aggregate: the repository ADAPTER implementing the port — maps domain <-> row (columns + details JSONB with child collections), resolves MDM reads via 102034, writes metrics. The ONLY place with ctx.data.", "savedArtifact": "l1/{module}/layer_1_external/adapters/persistence/{entity}RepositoryAdapter.defs.ts" },
-    { "planId": "gen-usecase", "agentName": "agentCbUsecase", "type": "agent", "modelAlias": "codehigh", "executionMode": "parallel_dynamic", "dependsOn": ["gen-repository-port", "gen-domain-entity"], "dynamicSource": { "sourcePlanId": "plan-usecase-index", "selectorField": "usecaseId", "argsField": "usecaseId" }, "toolSchema": "CbUsecaseResult", "strictTool": true, "goal": "Per operation/workflow: the usecase (WHAT happens) orchestrating domain + ports, applying rulesApplied, wrapping multi-aggregate writes in one transaction. Imports ports + domain ONLY — never the concrete adapter, never ctx.data.", "savedArtifact": "l1/{module}/layer_2_application/usecases/{usecase}.defs.ts" },
-    { "planId": "gen-http-controller", "agentName": "agentCbHttpController", "type": "agent", "modelAlias": "codepro", "executionMode": "parallel_dynamic", "dependsOn": ["gen-usecase"], "skipWhen": "no selected backend owner exists", "dynamicSource": { "sourcePlanId": "plan-usecase-index", "selectorField": "usecaseId", "argsField": "usecaseId" }, "toolSchema": "CbHttpControllerResult", "strictTool": true, "goal": "Per selected L4 owner: one BFF controller handler that calls the owner's usecase. Route key reuses owner.bffName; fallback is {module}.{pageId}.{commandName} only for L4 legacy. If a per-page frontend contract exists, use it only as Output refinement. No ctx.data, no persistence import.", "savedArtifact": ["l1/{module}/layer_1_external/adapters/http/controllers/{owner}.defs.ts", "l1/{module}/layer_1_external/adapters/http/routes/router.ts (entries)"] },
-
-    { "planId": "prepare-defs-pipeline", "agentName": "agentPrepareDefsL1", "type": "agent", "modelAlias": "codepro", "executionMode": "sequential", "dependsOn": ["gen-repository-adapter", "gen-usecase", "gen-http-controller"], "goal": "REUSED. Append `export const pipeline` to every generated .defs.ts that lacks one, in dependency order (domain -> ports -> tables -> adapters -> usecases -> http), and spawn the per-file resolution fan-out. Ensures the singletons (router.ts, persistence.ts, module.ts, config.json)." },
-    { "planId": "materialize-l1-def", "agentName": "agentMaterializeL1Def", "type": "agent", "modelAlias": "codepro", "executionMode": "parallel_dynamic", "dependsOn": ["prepare-defs-pipeline"], "dynamicSource": { "sourcePlanId": "prepare-defs-pipeline", "selectorField": "defsPath", "argsField": "defsPath" }, "goal": "REUSED. Per .defs.ts: resolve the pipeline item (outputPath .ts + dependsFiles .d.ts of the inner dependency layer) via tool call; deterministic layers (persistence table) skip the LLM." },
-    { "planId": "materialize-gen", "agentName": "agentMaterializeGen", "type": "agent", "modelAlias": "codeinstruct", "executionMode": "parallel_dynamic", "dependsOn": ["materialize-l1-def"], "dynamicSource": { "sourcePlanId": "materialize-l1-def", "selectorField": "outputPath", "argsField": "pipelineItem" }, "goal": "REUSED. Per pipeline item: generate the final .ts from the .defs.ts + dependsFiles (.d.ts of the callee) + the layer skill. Most quality-sensitive step -> best code model (codeinstruct)." },
-    { "planId": "register-backend", "agentName": "agentCbRegister", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["materialize-gen"], "goal": "DETERMINISTIC (no LLM). Wire the persistence manifest (tableDefinitions), the http router (route entries) and the COMPOSITION ROOT binding each repository port -> its adapter; fix l0/config.json entrypoints to the hexagonal paths. Never registers MDM tables." },
-
-    { "planId": "validate-all", "agentName": "agentCbValidateAll", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["register-backend"], "goal": "Barrier. Non-blocking coverage/integrity report read from the SAVED l1 files: every selected owner produced its artifacts + .ts; ctx.data only in adapters/persistence; no MDM/horizontal table emitted; every http handler matches its contract Output; ports bound in the composition root.", "savedArtifact": "l4/trace/cb-health-report.json" },
-    { "planId": "finalize-create-status", "agentName": "agentCbFinalizeStatus", "type": "agent", "modelAlias": null, "executionMode": "sequential", "dependsOn": ["validate-all"], "goal": "DETERMINISTIC. Set statusBackend = done for every selected owner whose artifacts + .ts validated. Leave unverified owners in inProgress with trace details (statusFrontend untouched)." },
-    { "planId": "final-summary", "agentName": "agentCbFinalSummary", "type": "agent", "modelAlias": "codeawsfast", "executionMode": "sequential", "dependsOn": ["finalize-create-status"], "goal": "AUTO-FINISH (no clarification): append the backend run to l5/{module}/process.defs.ts, concise report (aggregates, tables, usecases, controllers, owners done, warnings, v2-deferred), clear traces, clean task, complete. Summary viewable via openStepView." }
+    {
+      "planId": "(root)",
+      "agentName": "agentChangeBackend",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [],
+      "initialStatus": "waiting_human_input",
+      "goal": "Root orchestrator. No input args. Reads the CLI command (run|rebuild-defs|rebuild-all) and enqueues cb-scan. Finishes immediately if the scan finds no toCreate work."
+    },
+    {
+      "planId": "cb-scan",
+      "agentName": "agentCbScanCreateOwners",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "(root)"
+      ],
+      "goal": "DETERMINISTIC. Read l4/l5 and select owners (operations/workflows) with statusBackend = toCreate. Enqueue cb-validate-readiness.",
+      "ifEmpty": "Complete with no file/status writes."
+    },
+    {
+      "planId": "cb-validate-readiness",
+      "agentName": "agentCbValidateL4Readiness",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-scan"
+      ],
+      "goal": "DETERMINISTIC preflight: entity/operation refs resolve to canonical l4 ids; non-blocking warnings. Enqueue cb-lock."
+    },
+    {
+      "planId": "cb-lock",
+      "agentName": "agentCbLockOwners",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-validate-readiness"
+      ],
+      "goal": "DETERMINISTIC. Set statusBackend = inProgress for the selected owners (operations AND workflows). Enqueue cb-aggregate-index."
+    },
+    {
+      "planId": "cb-aggregate-index",
+      "agentName": "agentCbAggregateIndex",
+      "type": "agent",
+      "modelAlias": "codehigh",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-lock"
+      ],
+      "strictTool": true,
+      "goal": "LLM. Group ontology entities into aggregates from kind + relationships (core->root, supporting->embedded, event->own append-only table classified by eventPolicy, mdm->no table). Enqueue cb-persistence-index."
+    },
+    {
+      "planId": "cb-persistence-index",
+      "agentName": "agentCbPersistenceIndex",
+      "type": "agent",
+      "modelAlias": "codehigh",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-aggregate-index"
+      ],
+      "strictTool": true,
+      "goal": "LLM. Per aggregate/event table pick indexed columns vs details JSONB; event tables index owner FK + timestamp and carry retention. Enqueue cb-usecase-index."
+    },
+    {
+      "planId": "cb-usecase-index",
+      "agentName": "agentCbUsecaseIndex",
+      "type": "agent",
+      "modelAlias": "codepro",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-persistence-index"
+      ],
+      "strictTool": true,
+      "goal": "LLM. Map each OPERATION owner to a usecase + its ports (workflows are orchestration, not owners). Enqueue cb-bff-index."
+    },
+    {
+      "planId": "cb-bff-index",
+      "agentName": "agentCbBffIndex",
+      "type": "agent",
+      "modelAlias": "codepro",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-usecase-index"
+      ],
+      "skipWhen": "no page contract exists yet (frontend not run) -> skips the LLM",
+      "strictTool": true,
+      "goal": "LLM (conditional). Index page contracts for Output refinement when present. Enqueue cb-gen-domain."
+    },
+    {
+      "planId": "cb-gen-domain",
+      "agentName": "agentCbDomainEntity",
+      "type": "agent",
+      "modelAlias": "codehigh",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-bff-index"
+      ],
+      "strictTool": true,
+      "goal": "LLM, WHOLE LAYER in one call (array result). Pure domain entities per aggregate root + value-objects, plus one immutable record per persisted event. Enqueue cb-gen-port.",
+      "savedArtifact": [
+        "l1/{module}/layer_3_domain/entities/*.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-gen-port",
+      "agentName": "agentCbRepositoryPort",
+      "type": "agent",
+      "modelAlias": "codepro",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-gen-domain"
+      ],
+      "strictTool": true,
+      "goal": "LLM, whole layer. Repository ports I{Entity}Repository per aggregate; append-only ports (append+finders) per persisted event. Enqueue cb-gen-table.",
+      "savedArtifact": [
+        "l1/{module}/layer_2_application/ports/*.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-gen-table",
+      "agentName": "agentCbPersistenceTable",
+      "type": "agent",
+      "modelAlias": "codehigh",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-gen-port"
+      ],
+      "strictTool": true,
+      "goal": "LLM, whole layer. TableDefinition per core root + per persisted event (append-only, purpose 'controle', retentionDays). MDM/reaction produce NO table. Enqueue cb-gen-adapter.",
+      "savedArtifact": [
+        "l1/{module}/layer_1_external/adapters/persistence/{table}.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-gen-adapter",
+      "agentName": "agentCbRepositoryAdapter",
+      "type": "agent",
+      "modelAlias": "codepro",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-gen-table"
+      ],
+      "strictTool": true,
+      "goal": "LLM, whole layer. Repository adapters implementing the ports (domain<->row + details JSONB; MDM via 102034; event adapters do insert-only). Enqueue cb-gen-usecase.",
+      "savedArtifact": [
+        "l1/{module}/layer_1_external/adapters/persistence/{entity}RepositoryAdapter.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-gen-usecase",
+      "agentName": "agentCbUsecase",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-gen-adapter"
+      ],
+      "goal": "DISPATCHER (no LLM). Fan out one usecase worker per OPERATION owner (cb-usecase-fanout) and enqueue the controller join (cb-gen-http, waiting_dependency on the fan-out)."
+    },
+    {
+      "planId": "cb-usecase-fanout",
+      "agentName": "agentCbUsecase",
+      "type": "agent",
+      "modelAlias": "codehigh",
+      "executionMode": "parallel_dynamic",
+      "dependsOn": [
+        "cb-gen-usecase"
+      ],
+      "maxParallel": 5,
+      "strictTool": true,
+      "goal": "LLM WORKER per operation owner: one usecase file with explicit functions[] input/output, orchestrating domain + ports, appending its eventWrites in the same transaction. Progress: 'Gerar usecases {{completed}}/{{total}}, falhas {{failed}}'.",
+      "savedArtifact": [
+        "l1/{module}/layer_2_application/usecases/{usecase}.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-gen-http",
+      "agentName": "agentCbHttpController",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-usecase-fanout"
+      ],
+      "goal": "DETERMINISTIC (no LLM). One controller per OPERATION owner (workflows generate none). Binds each handler to the usecase's REAL exported functions (read from the generated defs) — coherence by construction. Enqueue cb-materialize.",
+      "savedArtifact": [
+        "l1/{module}/layer_1_external/adapters/http/controllers/{owner}.defs.ts"
+      ]
+    },
+    {
+      "planId": "cb-materialize",
+      "agentName": "agentCbMaterialize",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-gen-http"
+      ],
+      "goal": "DISPATCHER (no LLM), ONE LAYER PER DISPATCH. Spawns only the innermost stale layer (cb-mat-L{rank}) and a sequential continue-dispatcher (cb-mat-after-L{rank}) that waits on that layer's planId and re-runs this dispatch. This is a REAL barrier: the runtime's addParallelArgs forces a parallel parent to in_progress at creation, so creating all layers at once is NOT a barrier (bug: controllers materialized while usecases were 13/18). dispatch is idempotent (materialized .ts stop being stale)."
+    },
+    {
+      "planId": "cb-mat-L{rank}",
+      "agentName": "agentCbMaterialize",
+      "type": "agent",
+      "modelAlias": "codeinstruct",
+      "executionMode": "parallel_dynamic",
+      "dependsOn": [
+        "cb-materialize (spawned one rank at a time; each next layer waits on the previous via cb-mat-after-L{rank})"
+      ],
+      "maxParallel": 5,
+      "goal": "LLM WORKER per .defs.ts of the current layer: generate the final .ts from the self-sufficient defs + dependsFiles (.d.ts) + skill. Layers in order: entidades de domínio(0) -> ports(1) -> tabelas(2) -> adapters(3) -> usecases(4) -> controllers(5). Progress: 'Materializar {layer} {{completed}}/{{total}}, falhas {{failed}}'.",
+      "savedArtifact": [
+        "l1/{module}/**/*.ts"
+      ]
+    },
+    {
+      "planId": "cb-register",
+      "agentName": "agentCbRegister",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "the last cb-mat layer"
+      ],
+      "goal": "DETERMINISTIC (no LLM). Write the module's backend block into the CLIENT-owned l5/project.json (backendControllers dir + persistence.tableDefsDir + routeKeys) so runtime assembly composes config.json without the masters importing the client (dependency inversion). Guarded: config failure never aborts. Enqueue cb-validate-all.",
+      "savedArtifact": [
+        "l5/project.json (modules[].backend)"
+      ]
+    },
+    {
+      "planId": "cb-validate-all",
+      "agentName": "agentCbValidateAll",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-register"
+      ],
+      "goal": "DETERMINISTIC barrier. Integrity from the SAVED l1 files: (a) every usecase port has a port + domain entity defs; (b) every controller handler.usecaseRef exists as a usecase export (coherence, catches the orderFlow break); (c) COMPLETENESS: every .defs.ts has its materialized .ts (fails if materialization is incomplete — the project-level check the per-file Monaco compile misses). FAILS the run on any missing ref, so finalize cannot mark owners done prematurely. Enqueue cb-finalize when clean.",
+      "savedArtifact": "l4/trace/cb-health-report.json"
+    },
+    {
+      "planId": "cb-finalize",
+      "agentName": "agentCbFinalizeStatus",
+      "type": "agent",
+      "modelAlias": null,
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-validate-all"
+      ],
+      "goal": "DETERMINISTIC. Set statusBackend = done for the processed owners (operations AND workflows). Runs only after cb-validate-all passes, so materialization is proven complete. Enqueue cb-final-summary."
+    },
+    {
+      "planId": "cb-final-summary",
+      "agentName": "agentCbFinalSummary",
+      "type": "agent",
+      "modelAlias": "codeawsfast",
+      "executionMode": "sequential",
+      "dependsOn": [
+        "cb-finalize"
+      ],
+      "goal": "Append the backend run to l5/{module}/process.defs.ts, emit a concise report, clear traces, clean the task, complete."
+    }
   ],
   "failurePolicy": {
     "beforeLock": "Fail without changing l4 owner statuses.",
@@ -185,7 +462,10 @@
       "pages / screens / menu / contract authoring / frontend client functions (statusFrontend)",
       "ontology / operations / workflows / rules (consumed)"
     ],
-    "consumedBy": ["A later L1 deploy/runtime registration", "future agentChangeBackend v2 for update/remove"],
+    "consumedBy": [
+      "A later L1 deploy/runtime registration",
+      "future agentChangeBackend v2 for update/remove"
+    ],
     "independentOf": "agentChangeFrontend (statusFrontend) — no mandatory order between the two reconcilers."
   }
 }

@@ -76,37 +76,57 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
   try {
     const project = mls.actualProject || 0;
     const entries = await scanEntries();
-    const stale = entries.filter(e => entryIsStale(project, e.defRef, e.item.outputPath));
-    if (!stale.length) {
-      return [
-        createAddStepIntent(context, parentStep, createAgentStepPayload('cb-register', 'agentCbRegister', 'Registrar backend', { planId: 'cb-register' }, [], 'sequential', 'waiting_dependency')),
-        createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'nothing stale to materialize'),
-      ];
-    }
-    // Group by layer rank and process layers in ascending order (inner-first).
+    const allStale = entries.filter(e => entryIsStale(project, e.defRef, e.item.outputPath));
+    // Materialize ONE layer per dispatch. The runtime's addParallelArgs forces a parallel parent to
+    // in_progress and enqueues its children the moment the add-step is applied, so a `dependsOn`
+    // between two parallel steps created together is NOT a real barrier — every layer would start at
+    // once (the observed cb-mat-controllers running while cb-mat-usecases was still 13/18). Instead we
+    // spawn ONLY the innermost stale layer now, then a SEQUENTIAL continue-dispatcher that waits
+    // (waiting_dependency) on that layer's planId and re-runs this dispatch after the layer TRULY
+    // finishes — the same proven barrier as cb-usecase-fanout -> cb-gen-http. dispatch is idempotent:
+    // the just-materialized .ts stop being stale, so the next call spawns the next layer, and finally
+    // cb-register when nothing is stale.
+    // minRank: the continue-dispatcher advances STRICTLY forward (rank+1) so a layer that a worker
+    // failed to materialize is never re-spawned under the same planId (a duplicate cb-mat-L{rank});
+    // its incompleteness is caught by cb-validate-all instead.
+    let minRank = 0;
+    try { const p = JSON.parse(String(step.prompt || '{}')); if (p && typeof p.minRank === 'number') minRank = p.minRank; } catch { /* default 0 */ }
     const byRank = new Map<number, DefsEntry[]>();
-    for (const e of stale) {
+    for (const e of allStale) {
       const r = layerRank(e.item.type);
+      if (r < minRank) continue;
       let bucket = byRank.get(r);
       if (!bucket) { bucket = []; byRank.set(r, bucket); }
       bucket.push(e);
     }
-    const ranks = [...byRank.keys()].sort((a, b) => a - b);
-    const intents: mls.msg.AgentIntent[] = [];
-    let prevPlan = '';
-    for (const rank of ranks) {
-      const planId = `cb-mat-L${rank}`;
-      const bucket = byRank.get(rank)!;
-      const refs = bucket.map(e => e.defRef);
-      // Content-based progress label (clearer than "Materializar L0/L1"): name the artifacts in this layer.
-      const label = layerLabel([...new Set(bucket.map(e => e.item.type))]);
-      intents.push(createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar ${label} {{completed}}/{{total}}, falhas {{failed}}`, refs, prevPlan ? [prevPlan] : [], 5));
-      prevPlan = planId;
+    if (byRank.size === 0) {
+      // No more layers to materialize from minRank up -> register.
+      return [
+        createAddStepIntent(context, parentStep, createAgentStepPayload('cb-register', 'agentCbRegister', 'Registrar backend', { planId: 'cb-register' }, [], 'sequential', 'waiting_dependency')),
+        createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `nothing stale to materialize (from L${minRank})`),
+      ];
     }
-    // cb-register runs after the last (outermost) layer finished materializing.
-    intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload('cb-register', 'agentCbRegister', 'Registrar backend', { planId: 'cb-register' }, [prevPlan], 'sequential', 'waiting_dependency')));
-    console.log(`${logPrefix(agent)} materialize fan-out: ${stale.length} file(s) across ${ranks.length} layer(s) [${ranks.join(',')}]`);
-    intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `materialize ${stale.length} file(s) in ${ranks.length} layer(s)`));
+    const remainingLayers = byRank.size;
+    const rank = Math.min(...byRank.keys());
+    const bucket = byRank.get(rank)!;
+    const planId = `cb-mat-L${rank}`;
+    const refs = bucket.map(e => e.defRef);
+    // Content-based progress label (clearer than "Materializar L0/L1"): name the artifacts in this layer.
+    const label = layerLabel([...new Set(bucket.map(e => e.item.type))]);
+    const intents: mls.msg.AgentIntent[] = [
+      // Current layer starts now (its inner layers are already materialized -> no dependsOn needed).
+      createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar ${label} {{completed}}/{{total}}, falhas {{failed}}`, refs, [], 5),
+    ];
+    if (remainingLayers > 1) {
+      // More layers to go: a continue-dispatcher runs ONLY after this layer completes (real barrier),
+      // then re-dispatches (minRank = rank+1) to spawn the next outer stale layer.
+      intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload(`cb-mat-after-L${rank}`, AGENT_NAME, 'Materializar (próxima camada)', { planId: 'cb-materialize', minRank: rank + 1 }, [planId], 'sequential', 'waiting_dependency')));
+    } else {
+      // Last stale layer: register runs after it materializes.
+      intents.push(createAddStepIntent(context, parentStep, createAgentStepPayload('cb-register', 'agentCbRegister', 'Registrar backend', { planId: 'cb-register' }, [planId], 'sequential', 'waiting_dependency')));
+    }
+    console.log(`${logPrefix(agent)} materialize layer ${label} (rank ${rank}, minRank ${minRank}): ${refs.length} file(s); ${remainingLayers - 1} layer(s) remaining`);
+    intents.push(createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `materializing ${label} (${refs.length} file(s)); ${remainingLayers - 1} layer(s) after`));
     return intents;
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
