@@ -133,6 +133,22 @@ NEVER store operational/transactional state (occupancy, movement, balances, `'oc
 in an MDM record — that is NOT cadastral data and belongs to a local `core` entity with its own table.
 The MDM `status` is always one of the four cadastral `MdmStatus` values.
 
+## Emitting events (append-only history)
+
+`data.eventWrites` lists events this usecase MUST record whenever the matching transition happens, so the
+history survives a restart instead of living only in memory. For each entry:
+
+- **persisted** (`purpose` telemetry/audit): its port is already in `data.ports`. Resolve it
+  (`resolveRepository<I{Event}Repository>(ctx, '{Event}')`), build the event record (new id via
+  `ctx.idGenerator.newId()`, owner id, the new status/values, timestamp via `ctx.clock.nowIso()`) and
+  `append(record)` it **inside the same `ctx.data.runInTransaction` as the aggregate write** — so the
+  state change and its event commit together. Never `update`/`delete` an event.
+- **reaction** (not persisted, `port` is null): there is no table — publish the trigger on the platform
+  queue (`ctx.data.pgQueue.publish({ topic, payload })`) instead of a port; do not store local history.
+
+Do NOT declare an event object and leave it unused: if `eventWrites` lists it, it must actually be
+appended/enqueued on the transition.
+
 ## `steps` are guidance, not a contract
 
 `data.steps` (and `data.functions[].steps`) are hints about intent. The CONTRACT you must satisfy is

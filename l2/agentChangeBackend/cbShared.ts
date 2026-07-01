@@ -57,6 +57,12 @@ export type ExecutionMode = 'sequential' | 'parallel_static' | 'parallel_dynamic
 export type OwnerStatus = 'toCreate' | 'toUpdate' | 'toRemove' | 'inProgress' | 'done';
 export type EntityKind = 'core' | 'supporting' | 'event' | 'metric' | 'mdm';
 
+// Persistence intent for kind:"event" entities (set by agentNewSolution2). Drives whether Stage 3
+// gives the event a durable table (telemetry/audit) or routes it to the outbox (reaction).
+export type EventPurpose = 'telemetry' | 'audit' | 'reaction';
+export interface EventPolicy { purpose: EventPurpose; retentionDays?: number; }
+export const DEFAULT_EVENT_RETENTION_DAYS = 90; // telemetry default when the ontology omits it
+
 export type CbFileInfo = Pick<mls.stor.IFileInfo, 'project' | 'level' | 'folder' | 'shortName' | 'extension'>;
 
 // ── domain model of a scan ─────────────────────────────────────────────────────
@@ -84,6 +90,7 @@ export interface CbEntity {
   ownership: string;
   moduleName: string;
   fields?: Record<string, unknown>[];
+  eventPolicy?: EventPolicy; // only for kind === 'event'
 }
 
 export interface CbRelationship {
@@ -100,6 +107,18 @@ export interface CbAggregate {
   mdmRefs: string[];         // mdm entities read via 102034 (no local table)
 }
 
+// A kind:"event" entity that needs end-to-end wiring (domain entity + append-only port + table +
+// adapter + a write from the owner's usecase). `persisted` is false only for reaction events, which
+// are delivered through the platform outbox instead of a local table.
+export interface CbEventTarget {
+  entityId: string;
+  ownerEntity: string;       // the core entity this event belongs to (from relationships)
+  purpose: EventPurpose;
+  retentionDays?: number;    // undefined = permanent (audit) or n/a (reaction)
+  persisted: boolean;        // telemetry/audit -> true (own table); reaction -> false (outbox)
+  fields?: Record<string, unknown>[];
+}
+
 export interface CbScan {
   project: number;
   moduleNames: string[];
@@ -107,6 +126,7 @@ export interface CbScan {
   entities: CbEntity[];
   relationships: CbRelationship[];
   aggregates: CbAggregate[];  // derived baseline (the LLM index may refine)
+  events: CbEventTarget[];    // kind:"event" entities, classified by eventPolicy
 }
 
 // ── deterministic l4 scan ──────────────────────────────────────────────────────
@@ -147,6 +167,7 @@ export async function readBackendScan(statuses: string[] = ['toCreate']): Promis
           ownership: readString(parsed.ownership) || 'moduleOwned',
           moduleName,
           fields: Array.isArray(parsed.fields) ? parsed.fields.filter(isRecord) : undefined,
+          eventPolicy: readEventPolicy(parsed.eventPolicy),
         });
       }
     }
@@ -167,7 +188,39 @@ export async function readBackendScan(statuses: string[] = ['toCreate']): Promis
   }
 
   const aggregates = deriveAggregates(entities, relationships, operatedRootIds);
-  return { project, moduleNames: Array.from(moduleNames).sort(), owners, entities, relationships, aggregates };
+  const events = deriveEventTargets(entities, relationships);
+  return { project, moduleNames: Array.from(moduleNames).sort(), owners, entities, relationships, aggregates, events };
+}
+
+// Read the optional event classification from an ontology def (shape-safe; ignores malformed input).
+function readEventPolicy(value: unknown): EventPolicy | undefined {
+  if (!isRecord(value)) return undefined;
+  const purpose = readString(value.purpose) as EventPurpose;
+  if (purpose !== 'telemetry' && purpose !== 'audit' && purpose !== 'reaction') return undefined;
+  const retentionDays = typeof value.retentionDays === 'number' ? value.retentionDays : undefined;
+  return retentionDays === undefined ? { purpose } : { purpose, retentionDays };
+}
+
+// Turn every kind:"event" entity into a first-class generation target. The owner is the related core
+// entity (relationship in either direction). Missing eventPolicy defaults to telemetry/90d so legacy
+// ontologies still get persisted instead of producing a dead in-memory object. reaction events are
+// NOT persisted locally (persisted:false) — the usecase routes them to the platform outbox.
+export function deriveEventTargets(entities: CbEntity[], relationships: CbRelationship[]): CbEventTarget[] {
+  const byId = new Map(entities.map(e => [e.entityId, e]));
+  const out: CbEventTarget[] = [];
+  for (const e of entities) {
+    if (e.kind !== 'event') continue;
+    const policy: EventPolicy = e.eventPolicy ?? { purpose: 'telemetry', retentionDays: DEFAULT_EVENT_RETENTION_DAYS };
+    let ownerEntity = '';
+    for (const rel of relationships) {
+      const other = rel.fromEntity === e.entityId ? rel.toEntity : rel.toEntity === e.entityId ? rel.fromEntity : '';
+      if (other && byId.get(other)?.kind === 'core') { ownerEntity = other; break; }
+    }
+    const persisted = policy.purpose !== 'reaction';
+    const retentionDays = policy.purpose === 'telemetry' ? (policy.retentionDays ?? DEFAULT_EVENT_RETENTION_DAYS) : policy.retentionDays;
+    out.push({ entityId: e.entityId, ownerEntity, purpose: policy.purpose, retentionDays, persisted, fields: e.fields });
+  }
+  return out;
 }
 
 function collectModuleOntology(

@@ -96,8 +96,11 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
     let prevPlan = '';
     for (const rank of ranks) {
       const planId = `cb-mat-L${rank}`;
-      const refs = byRank.get(rank)!.map(e => e.defRef);
-      intents.push(createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar L${rank} {{completed}}/{{total}}, falhas {{failed}}`, refs, prevPlan ? [prevPlan] : [], 5));
+      const bucket = byRank.get(rank)!;
+      const refs = bucket.map(e => e.defRef);
+      // Content-based progress label (clearer than "Materializar L0/L1"): name the artifacts in this layer.
+      const label = layerLabel([...new Set(bucket.map(e => e.item.type))]);
+      intents.push(createParallelStepIntent(context, parentStep, planId, AGENT_NAME, `Materializar ${label} {{completed}}/{{total}}, falhas {{failed}}`, refs, prevPlan ? [prevPlan] : [], 5));
       prevPlan = planId;
     }
     // cb-register runs after the last (outermost) layer finished materializing.
@@ -110,6 +113,20 @@ async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, pa
     console.error(`${logPrefix(agent)} ${msg}`);
     return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'failed', msg)];
   }
+}
+
+// Human, content-based name for a materialization layer's progress title (replaces "L0/L1/…").
+const ARTIFACT_LABEL: Record<string, string> = {
+  domainEntity: 'entidades de domínio',
+  repositoryPort: 'ports',
+  persistenceTable: 'tabelas',
+  repositoryAdapter: 'adapters',
+  applicationUsecase: 'usecases',
+  httpController: 'controllers',
+};
+function layerLabel(types: string[]): string {
+  const names = types.map(t => ARTIFACT_LABEL[t] || t);
+  return names.length ? names.join(' + ') : 'artefatos';
 }
 
 // Read a context/skill ref, falling back from .d.ts to its generated .ts sibling (mirrors the CLI).

@@ -33,31 +33,78 @@ async function contractPageIds(): Promise<Set<string>> {
   return ids;
 }
 
+type UsecaseFn = { functionName: string; inputTypeName?: string; kind?: string };
+
+/** First `export const … = {…} as const;` — the artifact block (parseDefsSource spans both exports). */
+function parseArtifactData(content: string): Record<string, unknown> | undefined {
+  const s = content.indexOf('= ');
+  const e = content.indexOf(' as const;');
+  if (s === -1 || e <= s) return undefined;
+  try { const o = JSON.parse(content.slice(s + 2, e)); if (!isRecord(o)) return undefined; return isRecord(o.data) ? o.data : o; } catch { return undefined; }
+}
+
+/** Read each generated usecase's EXPORTED functions from its saved defs, keyed by usecaseId. The
+ * controller binds to these real names so it never imports a function the usecase did not produce. */
+async function readUsecaseFunctions(): Promise<Map<string, UsecaseFn[]>> {
+  const project = mls.actualProject || 0;
+  const map = new Map<string, UsecaseFn[]>();
+  for (const file of Object.values(mls.stor.files) as any[]) {
+    if (!file || file.project !== project || file.level !== 1 || file.status === 'deleted') continue;
+    if (file.extension !== '.defs.ts' || !String(file.folder || '').endsWith('/layer_2_application/usecases')) continue;
+    const data = parseArtifactData(String(await file.getContent()));
+    if (!data) continue;
+    const usecaseId = String((data as any).usecaseId || file.shortName || '');
+    const fns = Array.isArray((data as any).functions) ? (data as any).functions : [];
+    const parsed: UsecaseFn[] = fns
+      .map((f: any) => ({ functionName: String(f?.functionName || ''), inputTypeName: f?.inputTypeName ? String(f.inputTypeName) : undefined, kind: f?.kind ? String(f.kind) : undefined }))
+      .filter((f: UsecaseFn) => !!f.functionName);
+    if (usecaseId && parsed.length) map.set(usecaseId, parsed);
+  }
+  return map;
+}
+
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   try {
     const scan = await readBackendScan(['toCreate', 'inProgress']);
     const module = scan.moduleNames[0] || 'unknown';
     const contracts = await contractPageIds();
+    const usecaseFns = await readUsecaseFunctions();
     let saved = 0;
     for (const owner of scan.owners) {
       const ownerId = owner.id;
       if (!ownerId) continue;
+      // Only OPERATIONS are BFF command owners. Workflows are pure orchestration — no controller/command.
+      if (owner.kind !== 'operation') continue;
       const routePageId = owner.pageId || ownerId;
-      const commandName = owner.commandName || ownerId;
-      const routeKey = owner.bffName || `${module}.${routePageId}.${commandName}`;
-      const handlerName = `${module}${capitalize(ownerId)}Handler`;
-      const kind = owner.opKind || (owner.kind === 'workflow' ? 'command' : 'command');
+      const outputSource = contracts.has(routePageId) ? 'contract' : 'usecase';
+      // COHERENCE (item 3): bind handlers to the usecase's REAL exported functions read from the
+      // generated defs — never an assumed name. This prevents the controller from importing a function
+      // the usecase never produced (the orderFlow-class break). Fallback to the ownerId only if the defs
+      // are missing/unparsed.
+      const fns = usecaseFns.get(ownerId) || [];
+      const handlers: { handlerName: string; command: string; usecaseRef: string; inputTypeName?: string; kind: string }[] = [];
+      const routes: { key: string; handlerName: string }[] = [];
+      if (fns.length > 1) {
+        // A usecase exposing several functions -> one command/route per function (1:1 function<->command).
+        for (const fn of fns) {
+          const handlerName = `${module}${capitalize(fn.functionName)}Handler`;
+          handlers.push({ handlerName, command: fn.functionName, usecaseRef: fn.functionName, inputTypeName: fn.inputTypeName, kind: fn.kind || owner.opKind || 'command' });
+          routes.push({ key: `${module}.${routePageId}.${fn.functionName}`, handlerName });
+        }
+      } else {
+        const fn = fns[0];
+        const handlerName = `${module}${capitalize(ownerId)}Handler`;
+        const routeKey = owner.bffName || `${module}.${routePageId}.${owner.commandName || ownerId}`;
+        handlers.push({ handlerName, command: owner.commandName || ownerId, usecaseRef: fn?.functionName || ownerId, inputTypeName: fn?.inputTypeName, kind: fn?.kind || owner.opKind || 'command' });
+        routes.push({ key: routeKey, handlerName });
+      }
       const data = {
         pageId: routePageId,
         controllerName: `${capitalize(ownerId)}Controller`,
-        ownerKind: owner.kind,            // operation | workflow (l4 owner)
-        outputSource: contracts.has(routePageId) ? 'contract' : 'usecase',
-        handlers: [
-          { handlerName, command: commandName, usecaseRef: ownerId, kind },
-        ],
-        routes: [
-          { key: routeKey, handlerName },
-        ],
+        ownerKind: owner.kind,            // operation (workflows are skipped)
+        outputSource,
+        handlers,
+        routes,
       };
       const fi = httpControllerFileInfo(module, ownerId);
       const dependsFiles = [dtsRef(usecaseFileInfo(module, ownerId))];

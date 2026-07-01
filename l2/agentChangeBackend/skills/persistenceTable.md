@@ -50,4 +50,7 @@ export const orderTableDef: TableDefinition = {
 - ALWAYS include a `details` column `{ name: 'details', postgresType: 'JSONB', nullable: true }` when
   the aggregate has non-indexed fields or embedded collections.
 - One index per queryable column (FKs, status, ordering timestamp). `version: 1` for new tables.
-- `event` entities: append-only table (same shape, no `details` unless needed). MDM: emit NOTHING.
+- `event` entities (`data.appendOnly === true`): append-only table. Set `purpose: 'controle'`, index the
+  owner FK and the ordering timestamp, and when `data.retentionDays` is present add `retentionDays: <n>`
+  to the `TableDefinition` (the platform applies the TTL); omit it for a permanent audit trail. Same
+  JSONB rule — non-indexed fields go to `details`. MDM: emit NOTHING.

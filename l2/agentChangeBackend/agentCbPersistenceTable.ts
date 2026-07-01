@@ -29,7 +29,13 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     const plan = planTableColumns(byId.get(agg.rootEntity)?.fields || [], entityIds);
     return { tableId: agg.rootEntity, indexed: plan.indexed, detailsFields: plan.details, childCollections: agg.embeddedMembers };
   });
-  const human = `## Tables to derive (indexed columns vs details JSONB)\n${JSON.stringify(tables, null, 2)}\n\nReturn one TableDefinition per table: snake_case tableName/columns; only indexed columns are real, the rest live in a details JSONB column (detailsColumn.enabled=true, childCollections listed).`;
+  // Append-only event tables (telemetry/audit): same JSONB model, plus appendOnly + retentionDays so
+  // the TableDefinition gets purpose 'controle' and a TTL (omit retentionDays = permanent, for audit).
+  const eventTables = scan.events.filter(ev => ev.persisted).map(ev => {
+    const plan = planTableColumns(ev.fields || [], entityIds);
+    return { tableId: ev.entityId, indexed: plan.indexed, detailsFields: plan.details, childCollections: [] as string[], appendOnly: true, purpose: 'controle', retentionDays: ev.retentionDays };
+  });
+  const human = `## Tables to derive (indexed columns vs details JSONB)\n${JSON.stringify(tables, null, 2)}\n\n## Append-only event tables\n${JSON.stringify(eventTables, null, 2)}\n\nReturn one TableDefinition per table: snake_case tableName/columns; only indexed columns are real, the rest live in a details JSONB column (detailsColumn.enabled=true, childCollections listed). For event tables echo appendOnly=true, purpose="controle" and retentionDays (omit it for permanent audit); index the owner FK and the ordering timestamp.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 

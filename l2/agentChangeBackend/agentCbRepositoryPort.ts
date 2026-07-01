@@ -23,7 +23,9 @@ export function createAgent(): IAgentAsync {
 async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   const scan = await readBackendScan(['toCreate', 'inProgress']);
   const items = scan.aggregates.map(a => ({ entityId: a.rootEntity, embeddedMembers: a.embeddedMembers }));
-  const human = `## Aggregates\n${JSON.stringify(items, null, 2)}\n\nReturn one repository port (I{Entity}Repository) per aggregate, typed in domain terms.`;
+  // Append-only event ports: append(record) + read finders (listByOwnerId, listByPeriod). NO update/delete.
+  const eventItems = scan.events.filter(ev => ev.persisted).map(ev => ({ entityId: ev.entityId, appendOnlyEvent: true, owner: ev.ownerEntity }));
+  const human = `## Aggregates\n${JSON.stringify(items, null, 2)}\n\n## Append-only event ports\n${JSON.stringify(eventItems, null, 2)}\n\nReturn one repository port (I{Entity}Repository) per aggregate AND per event. Aggregate ports use getById/list/save/domain finders. Event ports are append-only: an append(record) method plus read finders (e.g. listByOwnerId, listByPeriod) — never update or delete. Typed in domain terms.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 

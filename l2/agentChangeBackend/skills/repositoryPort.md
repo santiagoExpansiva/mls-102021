@@ -32,3 +32,6 @@ export interface IOrderRepository {
 - A `{Entity}ListFilter` carries only indexed/queryable fields (PK, FKs, status). No filtering by
   fields that live in `details` JSONB.
 - No platform imports, no `ctx`, no SQL types.
+- Append-only EVENT ports (`data.appendOnly === true`): expose `append(record): Promise<{Event}>` plus
+  read finders (e.g. `listByOwnerId(ownerId)`, `listByPeriod(from, to)`). NO `save`/`update`/`delete` and
+  no mutation methods — an event, once recorded, is immutable.

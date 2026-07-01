@@ -28,7 +28,16 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     root: { entityId: agg.rootEntity, fields: byId.get(agg.rootEntity)?.fields || [] },
     embeddedMembers: agg.embeddedMembers.map(id => ({ entityId: id, fields: byId.get(id)?.fields || [] })),
   }));
-  const human = `## Aggregates (root + embedded members, with ontology fields)\n${JSON.stringify(items, null, 2)}\n\nReturn one pure domain entity per aggregate root; embedded members become valueObjects (collection=true for oneToMany).`;
+  // Persisted events (telemetry/audit) are immutable append-only records — generate a pure domain
+  // entity for each (no embedded members, no behavior beyond shape) so its port/adapter/table can type it.
+  const eventItems = scan.events.filter(ev => ev.persisted).map(ev => ({
+    aggregateId: ev.entityId,
+    root: { entityId: ev.entityId, fields: ev.fields || [] },
+    embeddedMembers: [] as { entityId: string; fields: Record<string, unknown>[] }[],
+    appendOnlyEvent: true,
+    eventOwner: ev.ownerEntity,
+  }));
+  const human = `## Aggregates (root + embedded members, with ontology fields)\n${JSON.stringify(items, null, 2)}\n\n## Append-only event records (one pure domain entity each, immutable, no valueObjects)\n${JSON.stringify(eventItems, null, 2)}\n\nReturn one pure domain entity per aggregate root AND per event record; embedded members become valueObjects (collection=true for oneToMany). Event records carry no invariants beyond their fields.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 

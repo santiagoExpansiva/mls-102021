@@ -35,7 +35,12 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
       detailsFields: plan.details,               // -> inside details JSONB
     };
   });
-  const human = `## Aggregates (column vs details split + embedded + mdm refs)\n${JSON.stringify(items, null, 2)}\n\nReturn one adapter per aggregate implementing I{Entity}Repository: map domain <-> row — only "columns" are real columns (snake_case), "detailsFields" + "embeddedMembers" go inside the details JSONB; resolve mdmRefs via 102034. ctx.data ONLY here.`;
+  // Append-only event adapters: implement the event port (append + read finders) over the event table.
+  const eventItems = scan.events.filter(ev => ev.persisted).map(ev => {
+    const plan = planTableColumns(ev.fields || [], entityIds);
+    return { entityId: ev.entityId, embeddedMembers: [] as string[], mdmRefs: [] as string[], columns: plan.indexed.map(c => c.fieldId), detailsFields: plan.details, appendOnlyEvent: true };
+  });
+  const human = `## Aggregates (column vs details split + embedded + mdm refs)\n${JSON.stringify(items, null, 2)}\n\n## Append-only event adapters\n${JSON.stringify(eventItems, null, 2)}\n\nReturn one adapter per aggregate AND per event implementing I{Entity}Repository: map domain <-> row — only "columns" are real columns (snake_case), "detailsFields" + "embeddedMembers" go inside the details JSONB; resolve mdmRefs via 102034. Event adapters implement append (insert one row, no update/delete) + the read finders. ctx.data ONLY here.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 

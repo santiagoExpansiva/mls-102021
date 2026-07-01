@@ -93,3 +93,7 @@ export function createOrderRepositoryAdapter(ctx: RequestContext): IOrderReposit
 - `orderBy` is always `{ field: '<column>', direction: 'asc'|'desc' }`. `getById` throws `NOT_FOUND`.
 - MDM-backed reads: resolve via `ctx.data.mdmEntityIndex` / `ctx.data.mdmDocument`; never a local table.
 - Multi-table writes (e.g. + event/metric) wrap in `ctx.data.runInTransaction(async (tx) => { ... })`.
+- Append-only EVENT adapters (`data.appendOnlyEvent === true`): implement the event port over its table —
+  `append(record)` does a single `insert({ record: toRow(record) })` (NEVER `update`/`delete`), and the
+  read finders use `findMany` with the owner FK and `orderBy` the timestamp. Same `{Event}Row`/`toRow`/
+  `toDomain` mapping (non-indexed fields in `details`).

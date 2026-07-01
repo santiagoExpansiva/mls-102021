@@ -7,6 +7,7 @@
 
 const str = { type: 'string' } as const;
 const bool = { type: 'boolean' } as const;
+const num = { type: 'number' } as const;
 const strArray = { type: 'array', items: str } as const;
 
 function objArray(required: string[], properties: Record<string, unknown>) {
@@ -113,6 +114,11 @@ export const persistenceTableResultSchema = {
     primaryKey: strArray,
     indexes: objArray(['indexName', 'columns'], { indexName: str, columns: strArray, unique: bool }),
     detailsColumn: { type: 'object', additionalProperties: false, required: ['enabled'], properties: { enabled: bool, columnName: str, childCollections: strArray } },
+    // Append-only event tables: appendOnly=true, purpose 'controle' (telemetry/audit), retentionDays
+    // carried to the TableDefinition (omitted = permanent). Absent for normal aggregate tables.
+    appendOnly: bool,
+    purpose: str,
+    retentionDays: num,
   },
 } as const;
 

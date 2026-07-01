@@ -1,8 +1,11 @@
 # Skill: httpController → `layer_1_external/adapters/http/controllers/{name}.ts`
 
 Generate the BFF handler(s) — driving HTTP adapter. **L4 is the source of truth**: generate exactly
-one `BffHandler` per entry in `data.handlers` (each has `command`, `usecaseRef`, `kind`); import the
-usecase named by `usecaseRef` and return its output. The frontend contract is OPTIONAL refinement:
+one `BffHandler` per entry in `data.handlers` (each has `command`, `usecaseRef`, `kind` and usually
+`inputTypeName`); import the usecase FUNCTION named EXACTLY by `usecaseRef` (it was read from the
+generated usecase, so the export is guaranteed to exist — never invent a different name) and its input
+type by `inputTypeName` when present (otherwise `{Capitalize(command)}Input`); call it and return its
+output. The frontend contract is OPTIONAL refinement:
 if `data.outputSource === 'contract'` (and the contract `.ts` is in dependsFiles), map the response to
 the contract Output exactly; otherwise the Output is the usecase output. Each handler validates the
 boundary input only. NO `ctx.data`, NO persistence/domain-internals import.
@@ -43,7 +46,9 @@ export const routes: ControllerRoute[] = [
   explicit return type after the arrow (`BffHandler` already encodes it).
 - Read input from `request.params` (cast to the usecase Input); boundary validation only (required
   fields, basic shape) → `AppError('VALIDATION_ERROR', …, 400)`. Business rules belong to the usecase.
-- Import the usecase function + its Input/Output types; call it; wrap the result in `ok(...)`.
+- Import the usecase function named by `usecaseRef` + its Input type (`inputTypeName` when given); call
+  it; wrap the result in `ok(...)`. The imported name MUST match `usecaseRef` exactly — do not rename it
+  to the command or the page.
 - `kind: 'query'` → return the queried data (unwrap the named output property); `command`/`mutation` →
   return the whole result. When a contract Output is provided, map field names to match it exactly.
 - NO `ctx.data`, NO imports from `adapters/persistence` or the domain internals.

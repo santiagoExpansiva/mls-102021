@@ -38,22 +38,36 @@ function workerOwnerId(args: string | undefined, step: mls.msg.AIAgentStep): str
   return p && !p.startsWith('{') ? p : '';
 }
 
-// Shared maps derived from the scan (aggregate roots, mdm ids, embedded child -> parent root).
+// Shared maps derived from the scan (aggregate roots, mdm ids, embedded child -> parent root, events).
 function deriveMaps(scan: CbScan) {
   const roots = new Set(scan.aggregates.map(a => a.rootEntity));
   const mdmIds = new Set(scan.entities.filter(e => e.kind === 'mdm').map(e => e.entityId)); // master data: read by id, no port
   const childToRoot = new Map<string, string>();
   for (const a of scan.aggregates) for (const m of a.embeddedMembers) childToRoot.set(m, a.rootEntity);
   const byId = new Map(scan.entities.map(e => [e.entityId, e]));
-  return { roots, mdmIds, childToRoot, byId };
+  // ownerEntity -> events the owner's usecases must emit when they mutate that aggregate.
+  const eventsByOwner = new Map<string, typeof scan.events>();
+  for (const ev of scan.events) {
+    const list = eventsByOwner.get(ev.ownerEntity) || [];
+    list.push(ev);
+    eventsByOwner.set(ev.ownerEntity, list);
+  }
+  return { roots, mdmIds, childToRoot, byId, eventsByOwner };
 }
 
 // The single-owner item sent to the LLM (explicit ports/mdmRefs + entity fields to shape input/output).
 function buildOwnerItem(o: CbOwner, maps: ReturnType<typeof deriveMaps>) {
-  const { roots, mdmIds, childToRoot, byId } = maps;
+  const { roots, mdmIds, childToRoot, byId, eventsByOwner } = maps;
   const fieldsOf = (id: string) => (byId.get(id)?.fields || []).map((f: any) => ({ fieldId: f.fieldId, type: f.type, required: f.required, ...(f.enum ? { enum: f.enum } : {}) }));
   const rawRefs = [...new Set([o.entity, ...o.reads, ...o.writes].filter(Boolean))];           // keep children + mdm for fields
   const portRefs = [...new Set(rawRefs.map(id => childToRoot.get(id) ?? id))];                  // children -> parent root
+  // Events the owner must emit: those owned by an aggregate this usecase writes (entity + writes).
+  const mutated = new Set([o.entity, ...o.writes].filter(Boolean).map(id => childToRoot.get(id) ?? id));
+  const eventWrites = [...new Set([o.entity, ...o.writes].filter(Boolean))]
+    .flatMap(id => eventsByOwner.get(id) || [])
+    .concat([...mutated].flatMap(id => eventsByOwner.get(id) || []))
+    .filter((ev, i, arr) => arr.findIndex(x => x.entityId === ev.entityId) === i)
+    .map(ev => ({ entityId: ev.entityId, owner: ev.ownerEntity, purpose: ev.purpose, persisted: ev.persisted, port: ev.persisted ? ev.entityId : null }));
   return {
     usecaseId: o.id,
     ownerKind: o.kind,
@@ -65,6 +79,7 @@ function buildOwnerItem(o: CbOwner, maps: ReturnType<typeof deriveMaps>) {
     rulesApplied: o.rulesApplied,
     ports: portRefs.filter(id => roots.has(id) && !mdmIds.has(id)),
     mdmRefs: rawRefs.filter(id => mdmIds.has(id)),
+    eventWrites, // append-only events to emit (persisted -> via its port; reaction -> outbox)
     entityFields: Object.fromEntries(rawRefs.map(id => [id, fieldsOf(id)])),
   };
 }
@@ -83,9 +98,12 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
 async function dispatch(agent: IAgentMeta, context: mls.msg.ExecutionContext, parentStep: mls.msg.AIAgentStep, step: mls.msg.AIAgentStep, hookSequential: number): Promise<mls.msg.AgentIntent[]> {
   try {
     const scan = await readBackendScan(['toCreate', 'inProgress']);
-    const ownerIds = scan.owners.map(o => o.id).filter(Boolean);
+    // Only OPERATIONS are BFF command owners with their own usecase. Workflows are pure L4
+    // orchestration/composition realized by their member operations — they generate no usecase,
+    // controller or command (their status is still finalized to done downstream).
+    const ownerIds = scan.owners.filter(o => o.kind === 'operation').map(o => o.id).filter(Boolean);
     if (!ownerIds.length) {
-      return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'no owners to generate')];
+      return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', 'no operation owners to generate')];
     }
     // stepTitle is used by the runtime as the progress templateTitle ({{completed}}/{{total}}/{{failed}}
     // are substituted live as workers finish), e.g. "Gerar usecases 27/27, falhas 0".
@@ -110,6 +128,7 @@ async function worker(agent: IAgentMeta, context: mls.msg.ExecutionContext, pare
   const scan = await readBackendScan(['toCreate', 'inProgress']);
   const owner = scan.owners.find(o => o.id === ownerId);
   if (!owner) return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'failed', `owner not found: ${ownerId}`)];
+  if (owner.kind !== 'operation') return [createUpdateStatusIntent(context, parentStep, step, hookSequential, 'completed', `skip ${ownerId}: workflows generate no usecase`)];
   const item = buildOwnerItem(owner, deriveMaps(scan));
   const human = `## Owner -> usecase (entity fields included so you can declare explicit input/output)\n${JSON.stringify(item, null, 2)}\n\nReturn ONE usecase with functions[] — each function has explicit input[] and output[] FIELDS (camelCase, derived from entityFields + opKind). A usecase MAY expose several functions with different IO.`;
   // prompt_ready args MUST equal the parallel child's queued hook args (the ownerId) so the runtime
@@ -142,7 +161,13 @@ async function afterPromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCont
     // Trust only REAL aggregate roots: the model sometimes invents port names ("dailyShiftPort",
     // "recipePort", "productionTicket"). Keep model ports only if they are real roots, union with the
     // deterministic ones (derived from the owner's entities, children resolved to their parent).
-    const ports = [...new Set([...readStringArray(result?.ports), ...detPorts])].filter(id => roots.has(id) && !mdmIds.has(id));
+    const aggPorts = [...new Set([...readStringArray(result?.ports), ...detPorts])].filter(id => roots.has(id) && !mdmIds.has(id));
+    // Persisted event ports the owner emits (own real ports too) — append-only writes within the txn.
+    const mutated = new Set(ownerRefs.map(id => childToRoot.get(id) ?? id));
+    const eventPortIds = scan.events
+      .filter(ev => ev.persisted && (ownerRefs.includes(ev.ownerEntity) || mutated.has(ev.ownerEntity)))
+      .map(ev => ev.entityId);
+    const ports = [...new Set([...aggPorts, ...eventPortIds])];
     result.ports = ports;
     result.mdmRefs = [...new Set(ownerRefs.filter(id => mdmIds.has(id)))];
     for (const fn of Array.isArray(result?.functions) ? result.functions : []) {
@@ -186,6 +211,13 @@ contract: the contract is input/output/ports.
 Entities in "mdmRefs" are master data in the shared 102034 store: there is NO port for them — reference
 them BY ID (the id is an input field) and read by id via ctx.data.mdmDocument.get({ mdmId }). Never put
 an mdmRef in ports and never resolveRepository it.
+
+"eventWrites" are append-only events this usecase MUST emit when it mutates the owning aggregate (so the
+history is never lost). For each: if persisted (telemetry/audit), build the event record and append it
+through its port (use its "port" id — it is already in your ports) INSIDE the same transaction as the
+aggregate write; never update or delete it. If NOT persisted (purpose "reaction"), enqueue it on the
+platform outbox instead of a local port. Always create the event when the corresponding transition
+happens — do NOT leave the record only in memory.
 
 Return functions[] (usually ONE, named from the operationId; MAY be several with different IO). Each
 function declares EXPLICIT fields:

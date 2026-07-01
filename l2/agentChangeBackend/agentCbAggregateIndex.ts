@@ -61,7 +61,9 @@ You are ${AGENT_NAME} for the collab.codes agentChangeBackend flow (Stage 3, hex
 Group the ontology entities into AGGREGATES using kind + relationships:
 - kind "core" -> aggregate root (own table).
 - kind "supporting" in a oneToMany/oneToOne under a core, not queried on its own -> embeddedMembers of that root (folded into its details JSONB, no own table).
-- kind "event" -> events[] (own append-only table).
+- kind "event" -> events[] of the core it belongs to (own append-only table). Events are classified by
+  eventPolicy.purpose: telemetry/audit are persisted (own append-only table with retention); reaction is
+  delivered via the outbox (no table). Always keep an event attached to its owning core via the relationship.
 - kind "mdm" -> mdmRefs[] (NO local table; read via 102034).
 Use canonical entityIds only. Call "{{toolName}}" with status/result/questions/trace. No prose.
 `;

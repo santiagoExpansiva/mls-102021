@@ -28,8 +28,8 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     const plan = planTableColumns(root?.fields || [], entityIds);
     return { tableId: agg.rootEntity, rootEntity: agg.rootEntity, ownership: root?.ownership || 'moduleOwned', indexedColumns: plan.indexed, detailsFields: plan.details, childCollections: agg.embeddedMembers };
   });
-  const events = scan.entities.filter(e => e.kind === 'event').map(e => ({ tableId: e.entityId, rootEntity: e.entityId, ownership: e.ownership, appendOnly: true, fields: (e.fields || []).map((f: any) => f.fieldId) }));
-  const human = `## Aggregates baseline (indexed columns vs details JSONB)\n${JSON.stringify(baseline, null, 2)}\n\n## Event tables (append-only)\n${JSON.stringify(events, null, 2)}\n\nRefine indexed columns; everything not indexed goes to details. MDM entities produce NO table.`;
+  const events = scan.events.filter(ev => ev.persisted).map(ev => ({ tableId: ev.entityId, rootEntity: ev.entityId, owner: ev.ownerEntity, ownership: byId.get(ev.entityId)?.ownership || 'moduleOwned', appendOnly: true, purpose: ev.purpose, retentionDays: ev.retentionDays, fields: (ev.fields || []).map((f: any) => f.fieldId) }));
+  const human = `## Aggregates baseline (indexed columns vs details JSONB)\n${JSON.stringify(baseline, null, 2)}\n\n## Event tables (append-only; telemetry/audit, with retention)\n${JSON.stringify(events, null, 2)}\n\nRefine indexed columns; everything not indexed goes to details. Event tables index the owner FK + ordering timestamp. MDM entities and reaction events produce NO table.`;
   return [createPromptReadyIntent(context, parentStep, hookSequential, (step.prompt || ""), systemPrompt.split('{{toolName}}').join(TOOL_NAME), human, toolSchema, TOOL_NAME)];
 }
 
