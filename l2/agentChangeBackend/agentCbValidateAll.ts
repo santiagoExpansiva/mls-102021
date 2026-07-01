@@ -16,6 +16,24 @@ function parseArtifact(content: string): Record<string, unknown> | undefined {
   try { const o = JSON.parse(content.slice(s + 2, e)); return isRecord(o) ? o : undefined; } catch { return undefined; }
 }
 
+// Module-local l1 imports of a generated .ts: `from '/_<project>_/l1/<folder>/<name>.js'`. Returns the
+// tsSet key (`${folder}::${shortName}`) so the caller can check the target was actually generated.
+// Cross-project imports (e.g. /_102034_/ platform) and non-l1 imports are ignored on purpose.
+function collectL1Imports(content: string, project: number): { key: string; target: string }[] {
+  const out: { key: string; target: string }[] = [];
+  const re = /from\s+['"]\/_(\d+)_\/l1\/([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) {
+    if (Number(m[1]) !== project) continue;
+    const path = m[2].replace(/\.(?:d\.ts|ts|js)$/u, '');
+    const lastSlash = path.lastIndexOf('/');
+    const folder = lastSlash >= 0 ? path.slice(0, lastSlash) : '';
+    const shortName = lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+    out.push({ key: `${folder}::${shortName.toLowerCase()}`, target: `_${project}_/l1/${path}` });
+  }
+  return out;
+}
+
 export function createAgent(): IAgentAsync {
   return { agentName: 'agentCbValidateAll', agentProject: 102021, agentFolder: 'agentChangeBackend', agentDescription: 'Deterministic non-blocking l1 coverage/integrity report', visibility: 'private', beforePromptStep };
 }
@@ -34,13 +52,18 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     const controllers: { id: string; refs: string[] }[] = []; // handler usecaseRefs per controller
     const tsSet = new Set<string>();       // `${folder}::${shortName}` of MATERIALIZED .ts outputs
     const defsFiles: { folder: string; shortName: string }[] = []; // each .defs.ts (to require a .ts sibling)
+    const importReqs: { from: string; key: string; target: string }[] = []; // module-local l1 imports to resolve
     for (const file of Object.values(mls.stor.files) as any[]) {
       if (!file || file.project !== project || file.level !== 1 || file.status === 'deleted') continue;
       const folder0 = String(file.folder || '');
       const shortName0 = String(file.shortName || '');
-      // Collect materialized .ts outputs (not the .defs.ts / .d.ts) for the completeness check.
+      // Collect materialized .ts outputs (not the .defs.ts / .d.ts) for the completeness check, and
+      // record their module-local l1 imports for the cross-file resolution check below.
       if (file.extension === '.ts' && !shortName0.endsWith('.defs') && !shortName0.endsWith('.d')) {
         tsSet.add(`${folder0}::${shortName0.toLowerCase()}`);
+        for (const req of collectL1Imports(String(await file.getContent()), project)) {
+          importReqs.push({ from: `${folder0}/${shortName0}`, key: req.key, target: req.target });
+        }
         continue;
       }
       if (file.extension !== '.defs.ts') continue;
@@ -93,6 +116,13 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
     // owners done while any .ts is still missing (the "finalize before materialization finished" gap).
     for (const d of defsFiles) {
       if (!tsSet.has(`${d.folder}::${d.shortName}`)) missing.push(`materialization incomplete -> ${d.folder}/${d.shortName}.ts not generated from its .defs.ts`);
+    }
+
+    // CROSS-FILE IMPORTS: every module-local l1 import in a generated .ts must resolve to a generated
+    // .ts. Root guard for hallucinated modules (e.g. importing layer_3_domain/rules/* — rules live
+    // inside the entity, that folder is never generated). Catches it deterministically before the VM build.
+    for (const req of importReqs) {
+      if (!tsSet.has(req.key)) missing.push(`import unresolved -> ${req.from}.ts imports '${req.target}' which was not generated`);
     }
     const warnings = mdmTableViolations > 0 ? [`${mdmTableViolations} MDM table artifact(s) found in persistence (should be 0)`] : [];
 
