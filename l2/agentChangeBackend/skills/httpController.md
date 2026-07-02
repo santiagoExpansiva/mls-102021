@@ -52,6 +52,12 @@ export const routes: ControllerRoute[] = [
 - `kind: 'query'` → return the queried data (unwrap the named output property); `command`/`mutation` →
   return the whole result. When a contract Output is provided, map field names to match it exactly.
 - NO `ctx.data`, NO imports from `adapters/persistence` or the domain internals.
+- `kind: 'dispatcher'` → the canonical BFF route from l4 (`bffName`) over a usecase that exposes several
+  functions (`usecaseRef` lists them separated by ` | `). Implement it WITHOUT calling usecases directly:
+  inspect the input params and delegate to the matching per-function handler already defined in this file
+  (pick by each function's required input field, e.g. an id field present → the byId variant; otherwise the
+  list/other variant). If no variant matches, throw `AppError('VALIDATION_ERROR', ...)` naming the accepted
+  fields. Never drop this route: the l2 contract calls the canonical name.
 - ALWAYS export `const routes: ControllerRoute[]` with one entry per `data.routes[]`: `{ key, handler }`,
   where `key` is the route key from the defs (`{module}.{page}.{command}`) and `handler` is the exported
   handler const. The runtime discovers routes from this export — there is NO generated router file.

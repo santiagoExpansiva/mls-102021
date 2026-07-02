@@ -91,6 +91,15 @@ async function beforePromptStep(agent: IAgentMeta, context: mls.msg.ExecutionCon
           handlers.push({ handlerName, command: fn.functionName, usecaseRef: fn.functionName, inputTypeName: fn.inputTypeName, kind: fn.kind || owner.opKind || 'command' });
           routes.push({ key: `${module}.${routePageId}.${fn.functionName}`, handlerName });
         }
+        // L4 is the source of truth for the BFF contract: the canonical bffName route MUST
+        // also exist (the l2 contract calls it). Emit a dispatcher handler that selects the
+        // usecase function from the provided params (see httpController.md, kind 'dispatcher').
+        const canonicalKey = owner.bffName || `${module}.${routePageId}.${owner.commandName || ownerId}`;
+        if (!routes.some(r => r.key === canonicalKey)) {
+          const dispatcherName = `${module}${capitalize(owner.commandName || ownerId)}Handler`;
+          handlers.push({ handlerName: dispatcherName, command: owner.commandName || ownerId, usecaseRef: fns.map(f => f.functionName).join(' | '), kind: 'dispatcher' });
+          routes.push({ key: canonicalKey, handlerName: dispatcherName });
+        }
       } else {
         const fn = fns[0];
         const handlerName = `${module}${capitalize(ownerId)}Handler`;

@@ -44,6 +44,10 @@ async function updateL5BackendConfig(project: number, moduleName: string, routeK
   const file = (mls.stor.files as Record<string, any>)[key];
   if (!file || file.status === 'deleted') return 'l5/project.json not found; backend config skipped';
   const cfg = JSON.parse(String(await file.getContent()));
+  // Master signature: records who generated the backend and which production master the
+  // publish composer must use (mls-<masterProject>/l2/<agentFolder>/nodejsSaveConfigJson.ts).
+  if (!isRecord(cfg.masters)) cfg.masters = {};
+  cfg.masters.backend = { masterProject: 102021, agentFolder: 'agentChangeBackend', runtimeProject: 102034 };
   const controllersDir = `./_${project}_/l1/${moduleName}/layer_1_external/adapters/http/controllers`;
   const tableDefsDir = `./_${project}_/l1/${moduleName}/layer_1_external/adapters/persistence`;
   const modules = Array.isArray(cfg.modules) ? cfg.modules : (cfg.modules = []);
